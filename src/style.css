@@ -1,0 +1,732 @@
+:root {
+  --parchment: #e8d9b5;
+  --ink: #2b1d0e;
+  --wood: #3b2a18;
+  --wood-light: #5a4126;
+  --gold: #e8b44a;
+  --blood: #b2453a;
+  --frame: #1a1008;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: #14100b;
+  color: var(--parchment);
+  font-family: Georgia, "Times New Roman", serif;
+  overflow: hidden;
+  user-select: none;
+}
+
+#app {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+}
+
+#stage {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  max-width: calc((100vh - 24px) * 16 / 9);
+  max-height: 100%;
+  box-shadow: 0 0 0 4px var(--frame), 0 12px 40px rgba(0, 0, 0, 0.7);
+  border-radius: 4px;
+  overflow: hidden;
+
+  /*
+   * The HUD is laid out against a 1280-wide stage, so `--u` is one of those
+   * "design pixels" expressed in real ones. Every HUD size below is written
+   * as a multiple of it, which is what keeps the panels in proportion to the
+   * board instead of staying a fixed size and colliding once the window gets
+   * small. Clamped at both ends so text stays legible on a small screen and
+   * the HUD does not balloon on a very large one.
+   */
+  container-type: inline-size;
+  --u: clamp(0.6px, 0.078125cqw, 1.15px);
+}
+
+#game {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+}
+
+/* ---------- HUD ---------- */
+
+.panel {
+  position: absolute;
+  background: linear-gradient(180deg, rgba(59, 42, 24, 0.96), rgba(35, 24, 13, 0.96));
+  border: 2px solid var(--frame);
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+
+  /*
+   * A panel's own unit. `--panel-scale` is set on the element by the resize
+   * handle, so dragging a corner rescales that panel — and everything laid
+   * out inside it — without touching any of the others.
+   */
+  --pu: calc(var(--u) * var(--panel-scale, 1));
+}
+
+#topbar {
+  top: calc(12 * var(--u));
+  left: calc(12 * var(--u));
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: calc(20 * var(--pu));
+  padding: calc(8 * var(--pu)) calc(16 * var(--pu));
+  max-width: calc(100% - 24 * var(--u));
+}
+
+.stat {
+  display: flex;
+  align-items: center;
+  gap: calc(7 * var(--pu));
+  font-size: calc(19 * var(--pu));
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}
+
+.stat .icon {
+  font-size: calc(17 * var(--pu));
+}
+
+.stat:nth-child(1) .icon {
+  color: var(--gold);
+}
+.stat:nth-child(2) .icon {
+  color: var(--blood);
+}
+
+.stat .short {
+  color: var(--blood);
+}
+
+.stat span.short {
+  color: #e08a76;
+}
+
+.stat .label {
+  font-size: calc(13 * var(--pu));
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  opacity: 0.7;
+  font-weight: normal;
+}
+
+.btn {
+  font-family: inherit;
+  font-size: calc(15 * var(--pu));
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  color: #1d1409;
+  background: linear-gradient(180deg, #f0cf7d, #c99a34);
+  border: 2px solid var(--frame);
+  border-radius: 5px;
+  padding: calc(7 * var(--pu)) calc(18 * var(--pu));
+  cursor: pointer;
+}
+
+.btn:hover:not(:disabled) {
+  background: linear-gradient(180deg, #ffe79c, #dcae44);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.btn:disabled {
+  background: #4a3a26;
+  color: #8b7a63;
+  cursor: default;
+}
+
+#shop {
+  top: calc(12 * var(--u));
+  right: calc(12 * var(--u));
+  width: calc(210 * var(--pu));
+  padding: calc(12 * var(--pu));
+}
+
+#shop h2 {
+  font-size: calc(13 * var(--pu));
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  opacity: 0.7;
+  font-weight: normal;
+  margin-bottom: calc(10 * var(--pu));
+  border-bottom: 1px solid rgba(232, 217, 181, 0.2);
+  padding-bottom: calc(6 * var(--pu));
+}
+
+.shop-item {
+  display: flex;
+  align-items: center;
+  gap: calc(10 * var(--pu));
+  width: 100%;
+  font-family: inherit;
+  color: var(--parchment);
+  text-align: left;
+  background: rgba(0, 0, 0, 0.25);
+  border: 2px solid transparent;
+  border-radius: 5px;
+  padding: calc(8 * var(--pu));
+  margin-bottom: calc(7 * var(--pu));
+  cursor: pointer;
+}
+
+.shop-item:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.shop-item.selected {
+  border-color: var(--gold);
+  background: rgba(232, 180, 74, 0.16);
+}
+
+.shop-item:disabled {
+  opacity: 0.42;
+  cursor: default;
+}
+
+.shop-item.locked {
+  opacity: 0.62;
+  border-color: rgba(210, 137, 111, 0.35);
+}
+
+.shop-item .lock:not(:empty) {
+  display: block;
+  font-size: calc(10 * var(--pu));
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: #d2896f;
+  margin-top: calc(2 * var(--pu));
+}
+
+.swatch {
+  width: calc(26 * var(--pu));
+  height: calc(26 * var(--pu));
+  border-radius: 5px;
+  border: 2px solid var(--frame);
+  flex-shrink: 0;
+}
+
+/* The label column. `min-width: 0` lets it shrink inside the flex row so the
+   name can ellipsise instead of wrapping and making the row taller — which
+   would otherwise stop the panel shrinking properly when scaled down. */
+.shop-item > span:last-child {
+  min-width: 0;
+  flex: 1;
+}
+
+.shop-item .name {
+  font-size: calc(14 * var(--pu));
+  font-weight: bold;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shop-item .cost {
+  font-size: calc(12 * var(--pu));
+  color: var(--gold);
+}
+
+/* What the building costs besides gold: people to man it, grain to feed it.
+   Deliberately quieter than the price — it is a constraint to notice, not the
+   headline number. */
+.shop-item .upkeep:not(:empty) {
+  font-size: calc(11 * var(--pu));
+  opacity: 0.62;
+  margin-left: calc(7 * var(--pu));
+  white-space: nowrap;
+}
+
+.hint {
+  font-size: calc(11 * var(--pu));
+  line-height: 1.5;
+  opacity: 0.55;
+  margin-top: calc(10 * var(--pu));
+}
+
+/* ---------- Draggable / resizable / minimisable panels ---------- */
+
+.panel-head,
+.tp-head {
+  cursor: grab;
+  user-select: none;
+}
+
+.panel-head:active,
+.tp-head:active {
+  cursor: grabbing;
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(8 * var(--pu));
+  margin-bottom: calc(10 * var(--pu));
+  border-bottom: 1px solid rgba(232, 217, 181, 0.2);
+  padding-bottom: calc(6 * var(--pu));
+}
+
+.panel-head h2 {
+  margin: 0;
+  border: none;
+  padding: 0;
+}
+
+/* Which nation's roster the build panel is showing. */
+.panel-sub {
+  opacity: 0.62;
+  font-weight: normal;
+  font-size: calc(12 * var(--pu));
+}
+
+/* The rules this nation bends, listed under the panel heading. */
+#shop-perks:not(:empty) {
+  margin-bottom: calc(9 * var(--pu));
+  padding-left: calc(9 * var(--pu));
+  border-left: 2px solid rgba(232, 180, 74, 0.4);
+}
+
+#shop-perks span {
+  display: block;
+  font-size: calc(11 * var(--pu));
+  line-height: 1.45;
+  color: var(--gold);
+  opacity: 0.8;
+}
+
+.panel-min {
+  background: none;
+  border: none;
+  color: var(--parchment);
+  opacity: 0.55;
+  font-size: calc(17 * var(--pu));
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 calc(4 * var(--pu));
+}
+
+.panel-min:hover {
+  opacity: 1;
+}
+
+.panel.minimised .panel-body {
+  display: none;
+}
+
+.panel.minimised {
+  width: auto;
+  min-width: calc(132 * var(--pu));
+}
+
+.panel.minimised .panel-resize {
+  display: none;
+}
+
+/*
+ * Panels that can outgrow the stage keep their header pinned and scroll their
+ * own body, so a long build list can never span more than the board and
+ * strand the panel where it cannot be dragged vertically.
+ */
+.panel.scrolls {
+  display: flex;
+  flex-direction: column;
+  /*
+   * Deliberately short of the full board. A panel tall enough to span the
+   * stage leaves no vertical room to drag it, which is exactly the trap the
+   * build list used to fall into on a small screen.
+   */
+  max-height: 78%;
+}
+
+.panel.scrolls .panel-body {
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+  /* Room for the resize grip so it never sits on top of a button. */
+  padding-bottom: calc(10 * var(--pu));
+}
+
+/* The grip in the bottom-right corner, drawn as two diagonal rules. */
+.panel-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: calc(16 * var(--pu));
+  height: calc(16 * var(--pu));
+  cursor: nwse-resize;
+  touch-action: none;
+  background-image: linear-gradient(
+    135deg,
+    transparent 0 42%,
+    rgba(232, 217, 181, 0.5) 42% 52%,
+    transparent 52% 66%,
+    rgba(232, 217, 181, 0.5) 66% 76%,
+    transparent 76%
+  );
+  border-bottom-right-radius: 5px;
+}
+
+.panel-resize:hover {
+  background-color: rgba(232, 180, 74, 0.18);
+}
+
+/* ---------- Food stack popover ---------- */
+
+#food-stat {
+  position: relative;
+  cursor: help;
+}
+
+#food-popover {
+  display: none;
+  position: absolute;
+  top: calc(26 * var(--pu));
+  left: calc(-10 * var(--pu));
+  width: calc(208 * var(--pu));
+  background: linear-gradient(180deg, rgba(59, 42, 24, 0.98), rgba(35, 24, 13, 0.98));
+  border: 2px solid var(--frame);
+  border-radius: 6px;
+  padding: calc(9 * var(--pu)) calc(11 * var(--pu));
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
+  z-index: 20;
+}
+
+#food-stat:hover #food-popover,
+#food-stat.open #food-popover {
+  display: block;
+}
+
+.fp-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: calc(12 * var(--pu));
+  font-weight: normal;
+  padding: calc(2 * var(--pu)) 0;
+}
+
+.fp-row.total {
+  border-top: 1px solid rgba(232, 217, 181, 0.22);
+  margin-top: calc(4 * var(--pu));
+  padding-top: calc(5 * var(--pu));
+  font-weight: bold;
+}
+
+.fp-row .pos {
+  color: #8fd06a;
+}
+
+.fp-row .neg {
+  color: #e08a76;
+}
+
+.fp-note {
+  font-size: calc(10.5 * var(--pu));
+  line-height: 1.45;
+  opacity: 0.65;
+  margin-top: calc(6 * var(--pu));
+}
+
+/* ---------- Dev bar (testing only) ---------- */
+
+/* Bottom centre: the top strip belongs to the stats, which grow wider as
+   the realm does and used to run straight into this. */
+#devbar {
+  bottom: calc(12 * var(--u));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: calc(8 * var(--pu));
+  padding: calc(6 * var(--pu)) calc(12 * var(--pu));
+  opacity: 0.75;
+}
+
+#devbar:hover {
+  opacity: 1;
+}
+
+#devbar .label {
+  font-size: calc(13 * var(--pu));
+}
+
+#devbar input,
+#devbar select {
+  width: calc(76 * var(--pu));
+  font-family: inherit;
+  font-size: calc(13 * var(--pu));
+  color: var(--parchment);
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(232, 217, 181, 0.25);
+  border-radius: 4px;
+  padding: calc(4 * var(--pu)) calc(6 * var(--pu));
+}
+
+#devbar select {
+  width: auto;
+}
+
+#devbar .btn {
+  font-size: calc(13 * var(--pu));
+  padding: calc(5 * var(--pu)) calc(12 * var(--pu));
+}
+
+/* ---------- Tower panel ---------- */
+
+/* Defaults to the left so it does not sit on top of the city. Draggable. */
+#tower-panel {
+  bottom: calc(12 * var(--u));
+  left: calc(12 * var(--u));
+  width: calc(236 * var(--pu));
+  padding: calc(12 * var(--pu));
+}
+
+#tower-panel.hidden {
+  display: none;
+}
+
+.tp-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(232, 217, 181, 0.2);
+  padding-bottom: calc(6 * var(--pu));
+  margin-bottom: calc(9 * var(--pu));
+}
+
+.tp-head h3 {
+  font-size: calc(15 * var(--pu));
+  letter-spacing: 0.5px;
+}
+
+.tp-close {
+  background: none;
+  border: none;
+  color: var(--parchment);
+  opacity: 0.5;
+  font-size: calc(20 * var(--pu));
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 calc(2 * var(--pu));
+}
+
+.tp-close:hover {
+  opacity: 1;
+}
+
+.tp-stats {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: calc(3 * var(--pu)) calc(10 * var(--pu));
+  font-size: calc(12 * var(--pu));
+  margin-bottom: calc(10 * var(--pu));
+}
+
+.tp-stats .k {
+  opacity: 0.6;
+}
+
+.tp-stats .v {
+  text-align: right;
+  font-weight: bold;
+}
+
+.tp-stats .v.up {
+  color: #8fd06a;
+}
+
+.tp-options {
+  display: flex;
+  flex-direction: column;
+  gap: calc(7 * var(--pu));
+}
+
+.tp-opt {
+  background: rgba(0, 0, 0, 0.25);
+  border: 2px solid transparent;
+  border-radius: 5px;
+  padding: calc(8 * var(--pu));
+  text-align: left;
+  font-family: inherit;
+  color: var(--parchment);
+  cursor: pointer;
+  width: 100%;
+}
+
+.tp-opt:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.45);
+  border-color: rgba(232, 180, 74, 0.5);
+}
+
+.tp-opt:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.tp-opt.owned {
+  opacity: 0.75;
+  border-color: rgba(143, 208, 106, 0.4);
+}
+
+.tp-opt-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: calc(8 * var(--pu));
+  margin-bottom: calc(3 * var(--pu));
+}
+
+.tp-opt-name {
+  font-size: calc(13 * var(--pu));
+  font-weight: bold;
+  color: var(--gold);
+}
+
+.tp-opt.owned .tp-opt-name {
+  color: #8fd06a;
+}
+
+.tp-opt-tag {
+  font-size: calc(11 * var(--pu));
+  white-space: nowrap;
+  color: var(--gold);
+}
+
+.tp-opt-tag.owned {
+  color: #8fd06a;
+}
+
+/* Price stays visible when it cannot be paid, just dimmed. */
+.tp-opt-tag.unaffordable {
+  opacity: 0.6;
+}
+
+.tp-opt-lock {
+  display: block;
+  font-size: calc(10.5 * var(--pu));
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: #d2896f;
+  opacity: 0.85;
+  margin-top: calc(5 * var(--pu));
+}
+
+/* Skill-tree indentation: successors sit under what unlocks them. */
+.tp-opt[data-depth='1'] {
+  margin-left: calc(16 * var(--pu));
+}
+
+.tp-opt[data-depth='2'] {
+  margin-left: calc(32 * var(--pu));
+}
+
+.tp-opt[data-depth='3'] {
+  margin-left: calc(48 * var(--pu));
+}
+
+.tp-opt[data-depth]:not([data-depth='0']) {
+  position: relative;
+}
+
+.tp-opt[data-depth]:not([data-depth='0'])::before {
+  content: '';
+  position: absolute;
+  left: calc(-11 * var(--pu));
+  top: calc(-8 * var(--pu));
+  bottom: 50%;
+  width: calc(9 * var(--pu));
+  border-left: 2px solid rgba(232, 217, 181, 0.28);
+  border-bottom: 2px solid rgba(232, 217, 181, 0.28);
+  border-bottom-left-radius: 5px;
+}
+
+.tp-opt-desc {
+  font-size: calc(11 * var(--pu));
+  line-height: 1.45;
+  opacity: 0.7;
+}
+
+.tp-research {
+  background: rgba(232, 180, 74, 0.12);
+  border-radius: 5px;
+  padding: calc(8 * var(--pu));
+  margin-bottom: calc(9 * var(--pu));
+  font-size: calc(12 * var(--pu));
+}
+
+.tp-research.hidden {
+  display: none;
+}
+
+.tp-bar {
+  height: calc(5 * var(--pu));
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: calc(6 * var(--pu));
+}
+
+.tp-bar > div {
+  height: 100%;
+  background: var(--gold);
+  width: 0;
+}
+
+/* ---------- Overlay ---------- */
+
+#overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 7, 4, 0.78);
+}
+
+#overlay.hidden {
+  display: none;
+}
+
+.overlay-box {
+  text-align: center;
+  padding: calc(34 * var(--u)) calc(54 * var(--u));
+  background: linear-gradient(180deg, rgba(59, 42, 24, 0.98), rgba(35, 24, 13, 0.98));
+  border: 3px solid var(--frame);
+  border-radius: 8px;
+}
+
+.overlay-box h1 {
+  font-size: calc(40 * var(--u));
+  letter-spacing: 2px;
+  margin-bottom: calc(10 * var(--u));
+}
+
+.overlay-box p {
+  font-size: calc(15 * var(--u));
+  opacity: 0.75;
+  margin-bottom: calc(22 * var(--u));
+}
+
+.overlay-box .btn {
+  --pu: var(--u);
+}

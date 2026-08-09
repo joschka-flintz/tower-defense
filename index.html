@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Realm Defense</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <div id="stage">
+        <canvas id="game" width="1280" height="720"></canvas>
+
+        <div id="topbar" class="panel">
+          <div class="stat"><span class="icon">&#9733;</span><span id="stat-gold">100</span></div>
+          <div class="stat"><span class="icon">&#9829;</span><span id="stat-lives">20</span></div>
+          <div class="stat" title="Housing used / available"><span class="icon">&#8962;</span><span id="stat-housing">0 / 5</span></div>
+          <div class="stat" id="food-stat"><span class="icon">&#127805;</span><span id="stat-food">0</span>
+            <div id="food-popover">
+              <div class="fp-row"><span>In store</span><span id="fp-store">0</span></div>
+              <div class="fp-row"><span>Harvest</span><span id="fp-harvest" class="pos">0</span></div>
+              <div class="fp-row"><span>Eaten by your units</span><span id="fp-upkeep" class="neg">0</span></div>
+              <div class="fp-row total"><span>After this wave</span><span id="fp-after">0</span></div>
+              <div class="fp-note" id="fp-note"></div>
+            </div>
+          </div>
+          <div class="stat"><span class="label">Wave</span><span id="stat-wave">0 / 0</span></div>
+          <button id="btn-wave" class="btn">Start Wave</button>
+        </div>
+
+        <div id="devbar" class="panel">
+          <label class="label" for="dev-gold">Start gold</label>
+          <input id="dev-gold" type="number" min="0" step="25" value="175" />
+          <label class="label" for="dev-nation">Nation</label>
+          <select id="dev-nation"></select>
+          <button id="btn-newgame" class="btn">New game</button>
+        </div>
+
+        <div id="shop" class="panel draggable scrolls" data-resize>
+          <div class="panel-head" data-drag="shop">
+            <h2>Build <span id="shop-title" class="panel-sub"></span></h2>
+            <button class="panel-min" data-min="shop" title="Minimise">&minus;</button>
+          </div>
+          <div class="panel-body">
+            <div id="shop-perks"></div>
+            <div id="shop-items"></div>
+            <p class="hint">Click a tower, then click the map.<br />Right-click or Esc to cancel.<br />Drag the corner to resize.</p>
+          </div>
+        </div>
+
+        <div id="tower-panel" class="panel hidden draggable scrolls" data-resize>
+          <div class="tp-head" data-drag="tower-panel">
+            <h3 id="tp-name">Tower</h3>
+            <button class="panel-min" data-min="tower-panel" title="Minimise">&minus;</button>
+            <button id="btn-close-tower" class="tp-close" title="Close">&times;</button>
+          </div>
+          <div class="panel-body">
+          <div id="tp-stats" class="tp-stats"></div>
+            <div id="tp-options" class="tp-options"></div>
+          </div>
+        </div>
+
+        <div id="overlay" class="hidden">
+          <div class="overlay-box">
+            <h1 id="overlay-title">Game Over</h1>
+            <p id="overlay-text"></p>
+            <button id="btn-restart" class="btn">Play Again</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
