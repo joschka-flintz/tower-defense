@@ -38,10 +38,30 @@ renderer.render();
 await fetch('/__shot?name=check', { method: 'POST', body: canvas.toDataURL('image/png') });
 ```
 
+### The repository
+
+The project is a **git repository**, backed up to a **private** GitHub repo:
+
+```
+https://github.com/joschka-flintz/tower-defense.git
+```
+
+Two things about it worth not breaking:
+
+- **Commits use a noreply author address** (`joschka-flintz@users.noreply.github.com`), set as a
+  repo-local `user.email`. That is deliberate — it keeps the real address out of the history. If you
+  clone this somewhere fresh, set it again, or the global identity will leak back in.
+- **Work done with Claude carries a `Co-Authored-By: Claude Opus 5` trailer.** The author stays the
+  human whose account it is; the trailer is what records the assistance. Do not invent a separate
+  bot author.
+
+Push with `git push`. Git Credential Manager is configured system-wide, so the first push from a new
+machine opens a GitHub sign-in in the browser.
+
 ### Rolling back a change that did not work out
 
-The project is a **git repository**, and that is the fallback system. Every session's work should
-end in a commit, so any change can be undone wholesale.
+Git is the fallback system. Every session's work should end in a commit, so any change can be undone
+wholesale.
 
 ```bash
 git log --oneline
@@ -67,6 +87,16 @@ git reset --hard HEAD~1
 
 `node_modules/`, `dist/` and `.shots/` are ignored, so a reset never touches the installed packages
 or the screenshots.
+
+Once a commit has been **pushed**, prefer undoing it with a new commit rather than rewriting
+history:
+
+```bash
+git revert <sha>
+```
+
+`reset --hard` on something already pushed means a force-push, which is worth avoiding for the sake
+of one bad commit.
 
 **Commit before starting anything large**, and say in the message what has and has not been tested.
 The whole point is that "this update did not work out" is one command, not an afternoon of undoing
