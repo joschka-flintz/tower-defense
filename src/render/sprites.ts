@@ -897,6 +897,125 @@ export function drawMarchManAtArms(
 }
 
 /**
+ * A shieldbearer: pike levelled, kite shield up, in a mail hauberk. The
+ * Marches' middle rank — heavier than the men-at-arms beside him and visibly
+ * so, which is the point of the shield.
+ */
+export function drawMarchShieldbearer(
+  ctx: CanvasRenderingContext2D,
+  gait: number,
+  fighting: boolean,
+  resting: boolean,
+): void {
+  const swing = Math.sin(gait * 0.4);
+  const jab = fighting ? Math.sin(performance.now() * 0.018) * 1.2 : 0;
+
+  ctx.save();
+  ctx.scale(1.4, 1.4);
+  ctx.lineCap = 'round';
+
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.44)';
+  ctx.beginPath();
+  ctx.ellipse(0.6, 2, 5.8, 4.7, 0, 0, TAU);
+  ctx.fill();
+
+  ctx.strokeStyle = '#33301f';
+  ctx.lineWidth = 1.7;
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(-0.7, side * 1.8);
+    ctx.lineTo(-0.7 + swing * side * 1.8, side * 3.9);
+    ctx.stroke();
+  }
+
+  // Mail hauberk under a green surcoat — heavier than the men-at-arms' jack.
+  const coat = ctx.createLinearGradient(-4, -4, 3, 4);
+  coat.addColorStop(0, MARCH_LIGHT);
+  coat.addColorStop(1, MARCH_DARK);
+  ctx.fillStyle = coat;
+  ctx.strokeStyle = 'rgba(14, 18, 8, 0.82)';
+  ctx.lineWidth = 0.6;
+  ctx.beginPath();
+  ctx.ellipse(-0.9, 0, 4.5, 3.9, 0, 0, TAU);
+  ctx.fill();
+  ctx.stroke();
+
+  // Mail at the shoulders and hem.
+  ctx.fillStyle = 'rgba(158, 164, 170, 0.6)';
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.ellipse(-0.4, side * 3.3, 1.7, 1.2, side * 0.3, 0, TAU);
+    ctx.fill();
+  }
+
+  // The kite shield: the thing that tells him apart at a glance.
+  ctx.save();
+  ctx.translate(1.1, -3.7);
+  ctx.rotate(-0.35);
+  const face = ctx.createLinearGradient(-2.4, -3, 2.4, 3);
+  face.addColorStop(0, '#7d8f57');
+  face.addColorStop(1, '#374524');
+  ctx.fillStyle = face;
+  ctx.strokeStyle = 'rgba(16, 12, 6, 0.9)';
+  ctx.lineWidth = 0.6;
+  ctx.beginPath();
+  ctx.moveTo(0, -3.3);
+  ctx.quadraticCurveTo(2.5, -2.4, 2.2, 0.6);
+  ctx.quadraticCurveTo(1.8, 2.9, 0, 3.6);
+  ctx.quadraticCurveTo(-1.8, 2.9, -2.2, 0.6);
+  ctx.quadraticCurveTo(-2.5, -2.4, 0, -3.3);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // Steel rim and boss.
+  ctx.strokeStyle = 'rgba(214, 218, 224, 0.55)';
+  ctx.lineWidth = 0.4;
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(226, 222, 206, 0.8)';
+  ctx.beginPath();
+  ctx.arc(0, 0.1, 0.75, 0, TAU);
+  ctx.fill();
+  ctx.restore();
+
+  // Nasal helm.
+  ctx.fillStyle = '#9aa0a8';
+  ctx.beginPath();
+  ctx.arc(1.2, 0, 2.5, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(18, 18, 20, 0.82)';
+  ctx.lineWidth = 0.5;
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(22, 18, 12, 0.6)';
+  ctx.beginPath();
+  ctx.ellipse(2.1, 0, 0.9, 1.9, 0, 0, TAU);
+  ctx.fill();
+
+  // The pike: levelled and jabbing, or butt-down and upright at the post.
+  ctx.save();
+  ctx.rotate(resting ? -1.1 : 0);
+  const reach = 12.5 + jab;
+  ctx.strokeStyle = '#5c4527';
+  ctx.lineWidth = 1.15;
+  ctx.beginPath();
+  ctx.moveTo(-2.8, 1.7);
+  ctx.lineTo(reach - 2, -0.6);
+  ctx.stroke();
+  const head = ctx.createLinearGradient(reach - 3, 0, reach, 0);
+  head.addColorStop(0, '#8d949c');
+  head.addColorStop(1, '#e7ebef');
+  ctx.fillStyle = head;
+  ctx.beginPath();
+  ctx.moveTo(reach, -0.6);
+  ctx.lineTo(reach - 2.7, -1.7);
+  ctx.lineTo(reach - 2.7, 0.5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  ctx.restore();
+}
+
+/**
  * A sword knight of the Marches: full plate under a green surcoat, longsword.
  * The Kingdom's warhammer knight's opposite number — same harness, a blade
  * instead of a hammer.
@@ -1086,13 +1205,73 @@ export function drawMarchLancer(
 }
 
 /**
- * The Flail Guard on his post: a man with a spiked ball on a chain, whirling
- * it ready for whatever comes round the corner.
+ * The Flail Guard on his post, swinging a morning star in a full circle.
  *
- * Drawn live rather than baked, like the rock thrower, so the swing turns to
- * face its target. `recoil` runs 1 to 0 just after a strike.
+ * `sweepRadius` is the *actual* circle the game hits, in world units, and the
+ * ball is drawn orbiting on exactly that line — so what you can see is what
+ * gets hurt. `recoil` runs 1 to 0 just after a blow lands and drives the
+ * bright ring that marks the swing connecting.
+ *
+ * Drawn live rather than baked, since none of it holds still.
  */
-export function drawFlailGuard(ctx: CanvasRenderingContext2D, radius: number, recoil: number): void {
+export function drawFlailGuard(
+  ctx: CanvasRenderingContext2D,
+  radius: number,
+  recoil: number,
+  sweepRadius: number,
+): void {
+  // The circle first, in world units, before the figure is scaled to his post.
+  const spin = performance.now() * 0.0022;
+
+  // The ring the ball travels, always faintly visible so the threatened ground
+  // is legible even between blows.
+  ctx.strokeStyle = `rgba(200, 196, 210, ${0.1 + recoil * 0.4})`;
+  ctx.lineWidth = 1 + recoil * 3;
+  ctx.beginPath();
+  ctx.arc(0, 0, sweepRadius, 0, TAU);
+  ctx.stroke();
+
+  // A bright arc chasing the head round, so the direction of the swing reads.
+  ctx.strokeStyle = `rgba(226, 232, 240, ${0.15 + recoil * 0.55})`;
+  ctx.lineWidth = 2 + recoil * 4;
+  ctx.beginPath();
+  ctx.arc(0, 0, sweepRadius, spin - 1.5, spin);
+  ctx.stroke();
+
+  // The chain, out to the head on the ring.
+  const hx = Math.cos(spin) * sweepRadius;
+  const hy = Math.sin(spin) * sweepRadius;
+  ctx.strokeStyle = 'rgba(172, 170, 182, 0.85)';
+  ctx.lineWidth = 1.6;
+  ctx.setLineDash([3, 2.6]);
+  ctx.beginPath();
+  ctx.moveTo(Math.cos(spin) * radius * 0.5, Math.sin(spin) * radius * 0.5);
+  ctx.lineTo(hx, hy);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // The head itself, out on the ring where it can actually reach.
+  const headR = radius * 0.34;
+  const ball = ctx.createRadialGradient(hx - headR * 0.4, hy - headR * 0.4, headR * 0.2, hx, hy, headR);
+  ball.addColorStop(0, '#9a97a3');
+  ball.addColorStop(1, '#2f2d36');
+  ctx.fillStyle = ball;
+  ctx.beginPath();
+  ctx.arc(hx, hy, headR, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(10, 9, 12, 0.85)';
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+  ctx.strokeStyle = '#c2bfcb';
+  ctx.lineWidth = 1.1;
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * TAU + spin * 3;
+    ctx.beginPath();
+    ctx.moveTo(hx + Math.cos(a) * headR * 0.85, hy + Math.sin(a) * headR * 0.85);
+    ctx.lineTo(hx + Math.cos(a) * headR * 1.7, hy + Math.sin(a) * headR * 1.7);
+    ctx.stroke();
+  }
+
   ctx.save();
   ctx.scale(radius / 13, radius / 13);
   ctx.lineCap = 'round';
@@ -1146,44 +1325,17 @@ export function drawFlailGuard(ctx: CanvasRenderingContext2D, radius: number, re
   ctx.arc(1.2, 0, 2.5, Math.PI * 0.42, Math.PI * 1.58);
   ctx.fill();
 
-  // The flail: coiled overhead between blows, snapped forward as it strikes,
-  // so the post reads as wound up rather than idle.
-  const swing = performance.now() * 0.009;
-  const out = 4.6 + recoil * 5.2;
-  const angle = recoil > 0 ? 0 : Math.sin(swing) * 0.9;
-  const hx = 2 + Math.cos(angle) * out;
-  const hy = Math.sin(angle) * out;
-
-  ctx.strokeStyle = 'rgba(170, 168, 178, 0.8)';
-  ctx.lineWidth = 0.55;
-  ctx.setLineDash([0.9, 0.8]);
+  // The grip: both hands out towards the chain, which leaves the post rather
+  // than a weapon held close. The head itself is drawn out on the ring above,
+  // in world units, because that is where it actually reaches.
+  ctx.strokeStyle = '#4a3520';
+  ctx.lineWidth = 1.3;
   ctx.beginPath();
-  ctx.moveTo(2.6, 1.4);
-  ctx.lineTo(hx, hy);
-  ctx.stroke();
-  ctx.setLineDash([]);
-
-  const ball = ctx.createRadialGradient(hx - 0.6, hy - 0.6, 0.3, hx, hy, 2.1);
-  ball.addColorStop(0, '#9a97a3');
-  ball.addColorStop(1, '#2f2d36');
-  ctx.fillStyle = ball;
-  ctx.beginPath();
-  ctx.arc(hx, hy, 1.9, 0, TAU);
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(10, 9, 12, 0.85)';
-  ctx.lineWidth = 0.35;
+  ctx.moveTo(1.6, 1.2);
+  ctx.lineTo(4.4, 0.4);
   ctx.stroke();
 
-  ctx.strokeStyle = '#c2bfcb';
-  ctx.lineWidth = 0.5;
-  for (let i = 0; i < 6; i++) {
-    const a = (i / 6) * TAU + swing;
-    ctx.beginPath();
-    ctx.moveTo(hx + Math.cos(a) * 1.6, hy + Math.sin(a) * 1.6);
-    ctx.lineTo(hx + Math.cos(a) * 3, hy + Math.sin(a) * 3);
-    ctx.stroke();
-  }
-
+  ctx.restore();
   ctx.restore();
 }
 

@@ -122,8 +122,15 @@ export interface TowerDef {
   cost: number;
   /** Footprint radius: blocks placement and defines the drawn base. */
   radius: number;
-  /** How this tower hurts things. 'none' is a support building. */
-  attack: 'projectile' | 'hound' | 'melee' | 'none';
+  /**
+   * How this tower hurts things. 'none' is a support building.
+   *
+   * `sweep` picks **no target at all**: it turns a weapon in a full circle on
+   * a timer and everything standing inside that circle takes the blow. It is
+   * the tower equivalent of a fighter's whirlwind, and it uses the same
+   * `whirlwind*` stats.
+   */
+  attack: 'projectile' | 'hound' | 'melee' | 'sweep' | 'none';
   /**
    * Which sprite the renderer draws for this tower. For a melee post this also
    * picks the figure drawn for the fighters it sends onto the road — the post
@@ -143,6 +150,7 @@ export interface TowerDef {
     | 'heavy-knight'
     | 'mounted-knight'
     | 'men-at-arms'
+    | 'shieldbearer'
     | 'sword-knight'
     | 'lancer'
     | 'flail-guard'
@@ -210,6 +218,12 @@ export interface TowerDef {
   buildingHp?: number;
   /** Health per second the crew mends unaided. Siege engines only. */
   selfRepair?: number;
+
+  // `sweep` towers. A fighter gets these from upgrades; a sweep tower is born
+  // with them, because turning the circle *is* its attack.
+  whirlwindDamage?: number;
+  whirlwindRadius?: number;
+  whirlwindInterval?: number;
 
   readonly upgrades: readonly TowerUpgrade[];
 }
@@ -776,6 +790,78 @@ export const TOWERS = {
   },
 
   /**
+   * A pike behind a kite shield: the Marches' middle rank, and the piece that
+   * was missing from the roster.
+   *
+   * The realm's other foot were light and heavy with nothing in between, and
+   * its only pierce was a two-hundred-gold horseman — so the durability curve
+   * had a hole in the middle and the cheapest way to answer light armour was
+   * to buy cavalry. He fills both at once: medium harness, a pike's reach, and
+   * pierce on foot at a price you can pay early.
+   *
+   * Against the Marches' own men-at-arms he is the sturdier, longer-reaching,
+   * costlier option — and the *worse* one against plate, since pierce falls to
+   * 40% where slash keeps 55%. That is the trade, not a straight upgrade.
+   *
+   * The enemy Shieldbearer (`shieldman` in `creeps.ts`) is the same soldier on
+   * the other side.
+   */
+  shieldbearer: {
+    id: 'shieldbearer',
+    name: 'Shieldbearers',
+    housing: 1,
+    food: 1,
+    blurb: 'Two pikemen behind kite shields. The Marches’ middle rank: steadier, and they reach.',
+    cost: 75,
+    radius: 13,
+    attack: 'melee',
+    visual: 'shieldbearer',
+    baseColor: '#55684a',
+    // A pike, so a longer leash than the sword-and-buckler men-at-arms.
+    range: 175,
+    turnSpeed: 7,
+    units: 2,
+    unitHp: 150,
+    unitDps: 22,
+    unitSpeed: 96,
+    retreatAt: 0.4,
+    armor: 'medium',
+    damageType: 'pierce',
+    upgrades: [
+      {
+        id: 'braced-shields',
+        name: 'Braced Shields',
+        description: 'Shields locked and butts driven into the ground. Health 150 to 235 each.',
+        cost: 95,
+        stats: { unitHp: 235 },
+      },
+      {
+        id: 'third-rank',
+        name: 'Third Rank',
+        description:
+          'A third pike joins the wall, with his own health — and needs no housing or food of his own.',
+        cost: 110,
+        requires: ['braced-shields'],
+        stats: { units: 3 },
+      },
+      {
+        id: 'long-pikes',
+        name: 'Long Pikes',
+        description: 'Eighteen feet of ash instead of twelve. They hold a wider stretch: reach 175 to 225.',
+        cost: 90,
+        stats: { range: 225 },
+      },
+      {
+        id: 'drilled-wall',
+        name: 'Drilled Wall',
+        description: 'Daily drill at the levelled pike. Damage 22 to 36 per second each.',
+        cost: 120,
+        stats: { unitDps: 36 },
+      },
+    ],
+  },
+
+  /**
    * A flail on a chain, swung from a fixed post at whatever comes past.
    *
    * Mechanically a shooting emplacement with an absurdly short reach — the
@@ -792,20 +878,32 @@ export const TOWERS = {
     name: 'Flail Guard',
     housing: 1,
     food: 1,
-    blurb: 'Very short reach, never misses, blunt. Wants an inside corner — useless on a straight.',
+    blurb: 'Swings a morning star in a full circle. Hits everything around him at once — but only just around him.',
     cost: 85,
     radius: 13,
-    attack: 'projectile',
+    /**
+     * A `sweep` tower, and the only one. He picks nobody: the ball goes round
+     * on its own rhythm and whatever is inside the circle when it comes past
+     * takes the blow.
+     *
+     * This started life as an ordinary shooting tower that threw a flail head
+     * at a single enemy, which was wrong twice over — it made the whirling
+     * animation a lie, and it wasted the one idea that makes a very short reach
+     * worth having. A single-target weapon with a 95 reach is simply a bad
+     * shooting tower. A weapon that hits *everything* within 95 is a reason to
+     * go looking for an inside corner where the road doubles back and the whole
+     * press walks through the same circle.
+     */
+    attack: 'sweep',
     visual: 'flail-guard',
     baseColor: '#6a6470',
+    // For a sweep tower the range and the circle are the same thing, so the
+    // selection ring shows exactly what will be hit.
     range: 95,
+    whirlwindRadius: 95,
+    whirlwindDamage: 34,
+    whirlwindInterval: 1.5,
     turnSpeed: 8,
-    damage: 44,
-    fireRate: 0.7,
-    projectileSpeed: 900,
-    projectileShape: 'flail',
-    projectileRadius: 4,
-    accuracy: 1,
     damageType: 'blunt',
     buildingHp: 220,
     armor: 'medium',
@@ -813,32 +911,32 @@ export const TOWERS = {
       {
         id: 'heavier-head',
         name: 'Heavier Head',
-        description: 'A bigger ball on a shorter haft. Damage 44 to 72.',
+        description: 'A bigger ball on a shorter haft. Every swing hits for 34 instead of 24.',
         cost: 130,
-        stats: { damage: 72 },
+        stats: { whirlwindDamage: 52 },
       },
       {
         id: 'spiked-head',
         name: 'Spiked Head',
-        description:
-          'Flanges welded round the ball. The blow carries through to anything standing close by.',
+        description: 'Flanges welded round the ball, so every blow bites. Swings hit for 52 instead of 34.',
         cost: 180,
         requires: ['heavier-head'],
-        stats: { splashRadius: 32 },
+        stats: { whirlwindDamage: 74 },
       },
       {
         id: 'longer-chain',
         name: 'Longer Chain',
-        description: 'Another two feet of chain. Reach 95 to 135 — enough to matter on a gentler corner.',
+        description:
+          'Another two feet of chain. The circle widens from 95 to 135 — enough to matter on a gentler corner.',
         cost: 110,
-        stats: { range: 135 },
+        stats: { range: 135, whirlwindRadius: 135 },
       },
       {
         id: 'second-flail',
         name: 'Second Flail',
-        description: 'One in each hand, swung alternately. Strikes far more often.',
+        description: 'One in each hand, swung alternately. A blow every second instead of every 1.5.',
         cost: 150,
-        stats: { fireRate: 1.1 },
+        stats: { whirlwindInterval: 1 },
       },
     ],
   },
@@ -1399,9 +1497,9 @@ export function statsFor(def: TowerDef, purchased: ReadonlySet<string>): TowerSt
     dogHp: def.dogHp ?? 0,
     dogDps: def.dogDps ?? 0,
     dogSpeed: def.dogSpeed ?? 0,
-    whirlwindDamage: 0,
-    whirlwindRadius: 0,
-    whirlwindInterval: 0,
+    whirlwindDamage: def.whirlwindDamage ?? 0,
+    whirlwindRadius: def.whirlwindRadius ?? 0,
+    whirlwindInterval: def.whirlwindInterval ?? 0,
     armor: def.armor ?? 'unarmored',
     houseCapacity: def.houseCapacity ?? 0,
     foodOutput: def.foodOutput ?? 0,

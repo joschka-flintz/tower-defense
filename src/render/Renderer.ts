@@ -30,6 +30,7 @@ import {
   drawFlailHead,
   drawMarchLancer,
   drawMarchManAtArms,
+  drawMarchShieldbearer,
   drawMarchSwordKnight,
   makeCatapultSprite,
   makeFarmSprite,
@@ -97,6 +98,7 @@ const DEFENDER_DRAWERS: Record<
   'heavy-knight': drawDefenderKnight,
   'mounted-knight': drawDefenderMountedKnight,
   'men-at-arms': drawMarchManAtArms,
+  shieldbearer: drawMarchShieldbearer,
   'sword-knight': drawMarchSwordKnight,
   lancer: drawMarchLancer,
 };
@@ -158,6 +160,7 @@ export class Renderer {
         def.visual === 'heavy-knight' ||
         def.visual === 'mounted-knight' ||
         def.visual === 'men-at-arms' ||
+        def.visual === 'shieldbearer' ||
         def.visual === 'sword-knight' ||
         def.visual === 'lancer'
       ) {
@@ -974,7 +977,7 @@ export class Renderer {
     } else if (tower.def.visual === 'crossbow') {
       drawCrossbowFigure(ctx, tower.def.radius * 1.35, tower.flash);
     } else if (tower.def.visual === 'flail-guard') {
-      drawFlailGuard(ctx, tower.def.radius, tower.flash);
+      drawFlailGuard(ctx, tower.def.radius, tower.flash, tower.stats.whirlwindRadius);
     } else if (tower.def.visual === 'rock-thrower') {
       drawRockThrower(ctx, tower.def.radius, tower.flash);
     } else if (tower.def.visual === 'hot-oil') {

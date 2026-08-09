@@ -334,6 +334,15 @@ function combatPower(def: TowerDef, purchased: ReadonlySet<string>): number {
     return s.units * perMan * (1 + s.range / 500);
   }
 
+  if (def.attack === 'sweep') {
+    // Hits everything in the circle rather than one thing, so the area is
+    // worth as much as the damage. Squared, because that is how the ground it
+    // covers actually grows.
+    if (s.whirlwindInterval <= 0) return 0;
+    const perSecond = s.whirlwindDamage / s.whirlwindInterval;
+    return perSecond * (1 + (s.whirlwindRadius * s.whirlwindRadius) / 9000);
+  }
+
   if (def.attack === 'hound') {
     return s.dogs * (s.dogHp * 0.5 + s.dogDps * 9) * (1 + s.range / 500);
   }

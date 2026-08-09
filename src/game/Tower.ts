@@ -66,6 +66,8 @@ export class Tower implements DamageSource {
 
   angle = -Math.PI / 2;
   private cooldown = 0;
+  /** Sweep towers: seconds until the weapon comes round again. */
+  private sweepCooldown = 0;
   /** Firing animation: set to 1 on each shot, decays back to 0. */
   flash = 0;
   target: Creep | null = null;
@@ -358,7 +360,38 @@ export class Tower implements DamageSource {
     if (this.def.attack === 'hound') this.updateHounds(dt, ctx.creeps);
     else if (this.def.attack === 'melee') this.updateFighters(dt, ctx);
     // A crew mending its engine has put its tools down and is not shooting.
+    else if (this.def.attack === 'sweep' && !this.repairing) this.updateSweep(dt, ctx);
     else if (this.def.attack === 'projectile' && !this.repairing) this.updateProjectile(dt, ctx);
+  }
+
+  /**
+   * A weapon turned in a full circle on a timer. There is **no target**: the
+   * swing happens whether or not anything is there, and everything standing
+   * inside the circle when it comes past takes the blow.
+   *
+   * Unlike a fighter's whirlwind this does not wait for something to be in
+   * reach before starting the cooldown. A man conserves his strength; a post
+   * whose entire job is to keep the ball moving does not, and making the timer
+   * free-running is what keeps the animation honest — the ball you can see
+   * going round is the ball that hits.
+   */
+  private updateSweep(dt: number, ctx: TowerContext): void {
+    this.sweepCooldown -= dt;
+    if (this.sweepCooldown > 0) return;
+
+    const interval = this.stats.whirlwindInterval;
+    if (interval <= 0 || this.stats.whirlwindDamage <= 0) return;
+    // Hungry crews swing slower, exactly as hungry crews shoot slower.
+    this.sweepCooldown = interval / this.effectiveness;
+    this.flash = 1;
+
+    const reach = this.stats.whirlwindRadius;
+    const reachSq = reach * reach;
+    for (const creep of ctx.creeps) {
+      if (!creep.alive) continue;
+      if (dist2(this.x, this.y, creep.x, creep.y) > reachSq) continue;
+      creep.takeDamage(this.stats.whirlwindDamage, this.stats.damageType, this);
+    }
   }
 
   /**

@@ -124,6 +124,7 @@ export const NATIONS = {
     blurb: 'Longbows, lances and the open field. Never stops the enemy — reaches them first.',
     towers: [
       'men-at-arms',
+      'shieldbearer',
       'longbowman',
       'flail-guard',
       'sword-knight',

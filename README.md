@@ -128,7 +128,8 @@ Which of these you can build depends on your nation.
 | Rock Thrower | 70 | Kingdom | A man heaving dressed stones. Short reach, never misses, and **blunt** — the only damage type that gets *better* the heavier the target is armoured. The cheap answer to the wave-6 knights, and also installable in a gatehouse turret. |
 | Men-at-Arms | 50 | Marches | The Marches' cheap body and the mirror of the Kingdom's pikemen: **two** to a post again, but sword and buckler rather than a pike. Shorter reach, no formation — but they cut, and slash keeps far more of its bite against mail than pierce does. Upgrades: mail shirts, a third retainer, arming swords, back-and-breast (→ medium armour, slower). |
 | Longbowman | 55 | Marches | Reach **300** — by far the longest in the game — and feeble arrows to pay for it. A coverage tower, not a killing one: its worth is how long an enemy spends under fire. Upgrades: war bow, arrow storm, ranging marks (→ 380), fire arrows. |
-| Flail Guard | 85 | Marches | A spiked ball on a chain, swung from a fixed post. Reach **95** — almost nothing — so it wants an inside corner where the road doubles back and the same stretch passes it twice. Put it on a straight and it is wasted. The Marches' only blunt damage, which is what makes finding it a corner worth doing. Upgrades: heavier head, spiked head (splash), longer chain, second flail. |
+| Shieldbearers | 75 | Marches | **Two** pikemen behind kite shields — the Marches' middle rank. Medium armour and a pike's reach, where its other foot are light or heavy with nothing between. Pierce, so it is the *worse* choice against plate than the men-at-arms beside it (40% against 55%) and the sturdier one against everything else. Upgrades: braced shields, third rank, long pikes, drilled wall. |
+| Flail Guard | 85 | Marches | Swings a morning star in a **full circle** and hits *everything* inside it at once — it picks no target at all. The circle is only 95 across, so it wants an inside corner where the road doubles back and the whole press walks through the same ground. On a straight it is wasted. The Marches' only blunt damage. Upgrades: heavier head, spiked head, longer chain (circle → 135), second flail. |
 | Sword Knight | 165 | Marches | Plate and a longsword — the warhammer knight's opposite number. Cuts instead of crushing, so he is a fine general soldier and never the *right* one against plate. Upgrades: great helm, sworn oath, honed longsword, sweeping cut. |
 | Lancer | 200 | Marches | Needs **Husbandry**. Heavy horse, couched lance, **pierce**. Rides far out (leash 215) to break the light and unarmoured mass before it arrives — pierce is at its best there and its worst against the plate that comes later, which is what the Flail Guard is for. Upgrades: destrier, bodkin lance, couched charge, spare mounts. |
 | Archer | 30 | Wardens | Stands on the ground with a small footprint, so you can **mass** them. Long reach, slow deliberate shots, 80% hit chance. Upgrades: a timber shooting platform (more range and aim, and he visibly stands on it), a heavier bow, and fire arrows. |
@@ -139,6 +140,16 @@ Which of these you can build depends on your nation.
 | Catapult | 180 | Marches | Slow arcing stones that **always hit** and damage everything in a blast radius. Its crew can mend it, at the cost of not shooting. |
 | Stone Gatehouse | 180 | Kingdom | Built **across the road** (needs Advanced Construction). Enemies must break the gate before they can pass, which is the one thing that stops a *crowd* rather than a single enemy — for the Kingdom that makes it the keystone rather than a luxury. Only the gate breaks; the masonry and its two turrets survive and keep fighting. Repair is paid for and never happens automatically; the gate can also be reinforced (700 → 1200 → 2000). Each turret takes a Rock Thrower (blunt) or Hot Oil (fire, needs Fire Projectiles). |
 | Scholars' Hall | 150 | both | Does not attack. Develops technologies that apply to the whole realm. |
+
+### Sweep towers
+
+The Flail Guard is the only one, and it works unlike anything else on the board: it has **no
+target**. A timer turns the weapon in a full circle and every enemy standing inside takes the blow
+at once. The ring you can see on the ground is exactly the ring that gets hit.
+
+That is the whole reason a 95 reach is worth having. A single-target weapon that short would simply
+be a bad tower; one that hits *everything* that short is a reason to go hunting for the corner where
+the road doubles back on itself.
 
 ### Melee posts
 

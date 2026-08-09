@@ -488,6 +488,20 @@ export function createHud(game: Game): Hud {
     }
     if (tower.def.attack === 'none') return rows;
 
+    if (tower.def.attack === 'sweep') {
+      // No range/accuracy line: it does not aim at anybody, so those would be
+      // answering a question the tower never asks.
+      rows.push(['Swings', `every ${s.whirlwindInterval}s`]);
+      rows.push(['Hits for', String(Math.round(s.whirlwindDamage))]);
+      rows.push(['Circle', String(Math.round(s.whirlwindRadius))]);
+      rows.push(['Targets', 'Everything in the circle']);
+      rows.push(['Damage type', DAMAGE_LABEL[s.damageType]]);
+      rows.push(['vs U·L·M·H', `${effectivenessRow(s.damageType)}%`]);
+      rows.push(...structureRows(tower));
+      rows.push(...recordRows(tower));
+      return rows;
+    }
+
     if (tower.def.attack === 'melee') {
       rows.push(['Range', String(Math.round(s.range))]);
       rows.push(['Damage', `${Math.round(s.unitDps)}/s`]);
