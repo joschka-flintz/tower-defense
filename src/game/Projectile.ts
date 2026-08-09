@@ -5,7 +5,7 @@ import { FireField } from './FireField';
 
 /** Everything a shot carries with it, snapshotted when it is fired. */
 export interface ProjectileSpec {
-  shape: 'arrow' | 'boulder';
+  shape: 'arrow' | 'boulder' | 'flail';
   radius: number;
   damage: number;
   speed: number;

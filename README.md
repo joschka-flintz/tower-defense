@@ -63,8 +63,13 @@ the same for both. Rosters live in `src/data/nations.ts`.
 
 | Nation | Idea | State |
 | --- | --- | --- |
-| **The Kingdom** | Men-at-arms, stone walls and siege engines. No archers and no dogs: its ranged arm is the short, heavy crossbow and the rock thrower, and everything else is built to make the enemy stop and be fought. | Finished and balanced |
-| **The Wardens** | Bows, hounds and the long watch. Kills at a distance rather than holding the road. | **Placeholder** — the roster is only what the Kingdom gave up, and it has not been designed or balanced |
+| **The Kingdom** | Stone walls and short weapons. A gatehouse to make the enemy *stop*, then crossbows, rock throwers and men in the road. No archers, no dogs, and **no catapult**. | Balanced before the last round of changes |
+| **The Marches** | The other melee realm, and the Kingdom's opposite. **No gatehouse at all** — nothing here stops anybody. Instead it reaches: the longest bow in the game, a catapult, lancers with a long leash, and one flail emplacement tucked into a corner. | **New, not balanced** |
+| **The Wardens** | Bows, hounds and the long watch. Kills at a distance rather than holding the road. | **Placeholder** — only what the two kingdoms do not field, never designed |
+
+The **gatehouse/catapult split** is the point of the pair. Having both — a wall that halts a crowd
+*and* the artillery to shell it while it stands there — was the strongest thing in the game, so
+each realm gets exactly one of the two.
 
 There is no pre-game chooser yet. The **Nation** dropdown in the dev bar picks one; changing it and
 pressing *New game* restarts. The Kingdom is the default.
@@ -83,10 +88,13 @@ gatehouse standing, so it can simply be re-manned).
 Two ways to patch them up:
 
 - **A field hospital in reach** mends damaged emplacements as well as treating wounded fighters.
-  They keep shooting while it works.
-- **A siege engine's own crew** can mend it unaided — but only by putting down what they were
-  doing. Below half structure a catapult stands down entirely and does not fire again until it is
-  whole. *Carpenter's Tools* makes that much quicker.
+- **A siege engine's own crew** can mend it unaided. Below half structure a catapult stands down
+  and does not fire again until it is whole. *Carpenter's Tools* makes that much quicker.
+
+**Being worked on means not shooting**, whichever source is doing it — you cannot span the frame of
+an engine and crank it at the same time. That is the whole cost of repair, and it is what stops a
+hospital simply making a line of emplacements unkillable. A hospital heals fast, so the pause is
+usually brief; a catapult's own crew is slower but waits until the damage is worth downing tools for.
 
 Melee posts are deliberately **not** shootable. The men are the thing that dies there, and they
 already have their own loop — get hurt, fall back, be healed. This is also why enemy shooters only
@@ -100,10 +108,13 @@ A nation may also bend a *rule*, not just field a different list — deliberatel
 that merely had cheaper towers would be the same nation with a discount. Perks are declared in
 `nations.ts` and listed at the top of the build panel so they are discoverable.
 
-- **The Kingdom:** melee posts recover **75%** of their health between waves instead of 50%. This is
-  the counterweight to a roster that takes its casualties in the road rather than at two hundred
-  paces. It never makes a fighter stronger than he was — it makes a bad wave survivable. It applies
-  only to fighters; a shot-up emplacement mends at the same rate for everybody.
+- **The Kingdom:** melee posts recover **75%** of their health between waves instead of 50%. The
+  counterweight to a roster that takes its casualties in the road rather than at two hundred paces.
+  It never makes a fighter stronger than he was — it makes a bad wave survivable. Fighters only; a
+  shot-up emplacement mends at the same rate for everybody.
+- **The Marches:** Field Medicine costs **45% less** and a Field Hospital **30% less**. Its whole
+  shooting line can be shot at, so cheap medicine is what lets it afford the hospitals that keep
+  those emplacements standing — the same building doing two jobs.
 
 ## Towers
 
@@ -115,13 +126,18 @@ Which of these you can build depends on your nation.
 | Warhammer Knight | 160 | Kingdom | Plate and a hammer, and two people's worth of housing. Slow, short-leashed and expensive, and the only thing the Kingdom has that reliably breaks armour before the catapult. Upgrades: great helm, a sworn oath (tougher, holds down to 20%), a spiked head, and a two-handed sweep that crushes everything in reach. |
 | Mounted Knight | 190 | Kingdom | Needs **Husbandry** — no stables, no cavalry. Rides far out from his post (the longest leash of anything, 230) to cut down whatever is furthest along. Only medium armour: the weight is in the horse rather than a full harness. Upgrades: a destrier, steel barding (heavy armour, slower), a sharpened sabre, and trample — he rides straight through the press every 2.5s. |
 | Rock Thrower | 70 | Kingdom | A man heaving dressed stones. Short reach, never misses, and **blunt** — the only damage type that gets *better* the heavier the target is armoured. The cheap answer to the wave-6 knights, and also installable in a gatehouse turret. |
+| Men-at-Arms | 50 | Marches | The Marches' cheap body and the mirror of the Kingdom's pikemen: **two** to a post again, but sword and buckler rather than a pike. Shorter reach, no formation — but they cut, and slash keeps far more of its bite against mail than pierce does. Upgrades: mail shirts, a third retainer, arming swords, back-and-breast (→ medium armour, slower). |
+| Longbowman | 55 | Marches | Reach **300** — by far the longest in the game — and feeble arrows to pay for it. A coverage tower, not a killing one: its worth is how long an enemy spends under fire. Upgrades: war bow, arrow storm, ranging marks (→ 380), fire arrows. |
+| Flail Guard | 85 | Marches | A spiked ball on a chain, swung from a fixed post. Reach **95** — almost nothing — so it wants an inside corner where the road doubles back and the same stretch passes it twice. Put it on a straight and it is wasted. The Marches' only blunt damage, which is what makes finding it a corner worth doing. Upgrades: heavier head, spiked head (splash), longer chain, second flail. |
+| Sword Knight | 165 | Marches | Plate and a longsword — the warhammer knight's opposite number. Cuts instead of crushing, so he is a fine general soldier and never the *right* one against plate. Upgrades: great helm, sworn oath, honed longsword, sweeping cut. |
+| Lancer | 200 | Marches | Needs **Husbandry**. Heavy horse, couched lance, **pierce**. Rides far out (leash 215) to break the light and unarmoured mass before it arrives — pierce is at its best there and its worst against the plate that comes later, which is what the Flail Guard is for. Upgrades: destrier, bodkin lance, couched charge, spare mounts. |
 | Archer | 30 | Wardens | Stands on the ground with a small footprint, so you can **mass** them. Long reach, slow deliberate shots, 80% hit chance. Upgrades: a timber shooting platform (more range and aim, and he visibly stands on it), a heavier bow, and fire arrows. |
 | Houndmaster | 90 | Wardens | Sends a dog onto the road to pin an enemy and bite it. |
 | Crossbowman | 45 | both | The archer's opposite: short reach, very slow to crank, but hits far harder and rarely misses. For the Kingdom it is the *only* thing that shoots, which is why it can buy a ranging sight. Upgrades: windlass crank, steel prod, ranging sight, fire bolts. |
 | Swordsman | 60 | both | Steps onto the road and holds an enemy in place, like a dog — but he has real health, **medium armour**, and the enemy hits back. Below 35% health he breaks off and walks to the nearest Field Hospital. Upgrades: mail, a better sword, *Plate Armour* (heavy armour, but noticeably slower), and the *Wirbelattacke* — a full turn with the blade every 3 seconds that cuts everything within reach. |
 | Field Hospital | 100 | both | Does not attack (needs Field Medicine). Wounded fighters withdraw here and are healed back to fighting fitness, then return to their post; damaged emplacements in reach are mended too. It has a **reach** (210) — a man hurt outside it has nowhere to fall back to, so where you put it matters. Upgrades: trained surgeons (30 → 58 per second), stretcher bearers (reach 210 → 320). |
-| Catapult | 180 | Kingdom | Slow arcing stones that **always hit** and damage everything in a blast radius. Four independent upgrades. |
-| Stone Gatehouse | 180 | both | Built **across the road** (needs Advanced Construction). Enemies must break the gate before they can pass, which is the one thing that stops a *crowd* rather than a single enemy — for the Kingdom that makes it the keystone rather than a luxury. Only the gate breaks; the masonry and its two turrets survive and keep fighting. Repair is paid for and never happens automatically; the gate can also be reinforced (700 → 1200 → 2000). Each turret takes a Rock Thrower (blunt) or Hot Oil (fire, needs Fire Projectiles). |
+| Catapult | 180 | Marches | Slow arcing stones that **always hit** and damage everything in a blast radius. Its crew can mend it, at the cost of not shooting. |
+| Stone Gatehouse | 180 | Kingdom | Built **across the road** (needs Advanced Construction). Enemies must break the gate before they can pass, which is the one thing that stops a *crowd* rather than a single enemy — for the Kingdom that makes it the keystone rather than a luxury. Only the gate breaks; the masonry and its two turrets survive and keep fighting. Repair is paid for and never happens automatically; the gate can also be reinforced (700 → 1200 → 2000). Each turret takes a Rock Thrower (blunt) or Hot Oil (fire, needs Fire Projectiles). |
 | Scholars' Hall | 150 | both | Does not attack. Develops technologies that apply to the whole realm. |
 
 ### Melee posts

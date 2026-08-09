@@ -30,6 +30,13 @@ export interface PlacementWorld {
   techs: ReadonlySet<string>;
   /** Spare housing, for buildings that need people to man them. */
   housingFree: number;
+  /**
+   * What this nation actually pays for the building, which is not always what
+   * the table says — see `NationTraits.costs`. Passed in rather than read off
+   * the def so the affordability check here can never disagree with the price
+   * charged at purchase.
+   */
+  costOf: (def: TowerDef) => number;
 }
 
 export function checkPlacement(
@@ -38,7 +45,7 @@ export function checkPlacement(
   x: number,
   y: number,
 ): PlacementError {
-  const { map, towers, gates, gold, techs, housingFree } = world;
+  const { map, towers, gates, gold, techs, housingFree, costOf } = world;
   const r = def.radius;
 
   if (def.requiresTech && !techs.has(def.requiresTech)) return 'needs-research';
@@ -71,7 +78,7 @@ export function checkPlacement(
     if (Math.hypot(gate.x - x, gate.y - y) < (r + gate.def.radius) * 1.6) return 'occupied';
   }
 
-  if (gold < def.cost) return 'too-expensive';
+  if (gold < costOf(def)) return 'too-expensive';
 
   return 'ok';
 }

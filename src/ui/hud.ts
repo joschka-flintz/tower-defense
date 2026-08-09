@@ -133,7 +133,7 @@ export function createHud(game: Game): Hud {
       btn.title = def.blurb;
       btn.innerHTML =
         `<span class="swatch" style="background:${def.baseColor}"></span>` +
-        `<span><span class="name">${def.name}</span><span class="cost">${def.cost} gold</span>` +
+        `<span><span class="name">${def.name}</span><span class="cost">${game.costOf(def)} gold</span>` +
         `<span class="upkeep">${upkeepLabel(def)}</span>` +
         `<span class="lock"></span></span>`;
       btn.addEventListener('click', () => {
@@ -266,7 +266,7 @@ export function createHud(game: Game): Hud {
         id: `lot:${ref.lot.id}`,
         name: `Build ${def.name}`,
         description: def.blurb,
-        cost: def.cost,
+        cost: game.costOf(def),
         owned: false,
         blocker: game.lotBlocker(ref.lot),
         depth: 0,
@@ -324,11 +324,11 @@ export function createHud(game: Game): Hud {
         id: `${slot.index}:${id}`,
         name: def.name,
         description: def.blurb,
-        cost: def.cost,
+        cost: game.costOf(def),
         owned: false,
         blocker: locked
           ? `Needs ${techName}`
-          : game.gold < def.cost
+          : game.gold < game.costOf(def)
             ? 'Not enough gold'
             : null,
         depth: 0,
@@ -346,7 +346,7 @@ export function createHud(game: Game): Hud {
           id: tech.id,
           name: tech.name,
           description: tech.description,
-          cost: tech.cost,
+          cost: game.techCostOf(tech),
           owned,
           blocker: owned ? null : game.researchBlocker(tech),
           depth: depths.get(tech.id) ?? 0,
@@ -558,7 +558,7 @@ export function createHud(game: Game): Hud {
       tpName.textContent = `Empty Plot — ${def.name}`;
       tpStats.innerHTML =
         `<span class="k">Reserved for</span><span class="v">${def.name}</span>` +
-        `<span class="k">Cost</span><span class="v">${def.cost} gold</span>`;
+        `<span class="k">Cost</span><span class="v">${game.costOf(def)} gold</span>`;
     } else if (market) {
       const f = game.foodForecast;
       tpName.textContent = 'Market Square';
@@ -686,7 +686,7 @@ export function createHud(game: Game): Hud {
 
         btn.classList.toggle('selected', game.selectedTowerId === id);
         btn.classList.toggle('locked', Boolean(needsTech));
-        btn.disabled = Boolean(needsTech) || game.gold < def.cost;
+        btn.disabled = Boolean(needsTech) || game.gold < game.costOf(def);
 
         const lock = btn.querySelector<HTMLElement>('.lock');
         if (lock) lock.textContent = needsTech ? `Needs ${techName}` : '';

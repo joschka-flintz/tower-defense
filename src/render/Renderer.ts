@@ -26,6 +26,11 @@ import {
   drawDefenderKnight,
   drawDefenderMountedKnight,
   drawDefenderPikeman,
+  drawFlailGuard,
+  drawFlailHead,
+  drawMarchLancer,
+  drawMarchManAtArms,
+  drawMarchSwordKnight,
   makeCatapultSprite,
   makeFarmSprite,
   makeGatehouseSprite,
@@ -91,6 +96,9 @@ const DEFENDER_DRAWERS: Record<
   pikeman: drawDefenderPikeman,
   'heavy-knight': drawDefenderKnight,
   'mounted-knight': drawDefenderMountedKnight,
+  'men-at-arms': drawMarchManAtArms,
+  'sword-knight': drawMarchSwordKnight,
+  lancer: drawMarchLancer,
 };
 
 /**
@@ -148,7 +156,10 @@ export class Renderer {
         def.visual === 'swordsman' ||
         def.visual === 'pikeman' ||
         def.visual === 'heavy-knight' ||
-        def.visual === 'mounted-knight'
+        def.visual === 'mounted-knight' ||
+        def.visual === 'men-at-arms' ||
+        def.visual === 'sword-knight' ||
+        def.visual === 'lancer'
       ) {
         // These stand on the ground, and gain a scaffold when upgraded.
         this.towerSprites.set(def.id, makeGroundStandSprite(def, false));
@@ -161,7 +172,7 @@ export class Renderer {
         continue;
       }
       // The two gate emplacements are drawn live, with no base sprite.
-      if (def.visual === 'rock-thrower' || def.visual === 'hot-oil') continue;
+      if (def.visual === 'rock-thrower' || def.visual === 'hot-oil' || def.visual === 'flail-guard') continue;
 
       const sprite =
         def.visual === 'houndmaster'
@@ -962,6 +973,8 @@ export class Renderer {
       drawArcherFigure(ctx, tower.def.radius * 1.35, tower.flash);
     } else if (tower.def.visual === 'crossbow') {
       drawCrossbowFigure(ctx, tower.def.radius * 1.35, tower.flash);
+    } else if (tower.def.visual === 'flail-guard') {
+      drawFlailGuard(ctx, tower.def.radius, tower.flash);
     } else if (tower.def.visual === 'rock-thrower') {
       drawRockThrower(ctx, tower.def.radius, tower.flash);
     } else if (tower.def.visual === 'hot-oil') {
@@ -1321,6 +1334,7 @@ export class Renderer {
       ctx.rotate(p.angle);
       if (p.spec.damageType === 'fire') drawFlameTrail(ctx, p.spec.radius);
       if (p.spec.shape === 'arrow') drawArrow(ctx);
+      else if (p.spec.shape === 'flail') drawFlailHead(ctx, p.spec.radius);
       else drawBoulder(ctx, p.spec.radius);
       ctx.restore();
     }

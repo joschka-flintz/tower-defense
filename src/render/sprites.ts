@@ -779,6 +779,414 @@ export function drawDefenderMountedKnight(
   ctx.restore();
 }
 
+/*
+ * ---------------------------------------------------------------------------
+ * The Marches.
+ *
+ * The Kingdom wears deep red over steel; the border realm wears **green over
+ * worn leather**, with far less plate on show. Two realms made mostly of melee
+ * posts would be unreadable in one palette, and you may well want to look at
+ * both — so the livery does the work the silhouettes cannot.
+ * ---------------------------------------------------------------------------
+ */
+
+/** The Marches' colours: forest green over worn leather. */
+const MARCH_LIGHT = '#6f8a4a';
+const MARCH_DARK = '#2f4020';
+
+/**
+ * A man-at-arms: mail shirt, open kettle helm, sword and buckler. Lighter than
+ * the Kingdom's swordsman on purpose — a retained soldier rather than a
+ * household knight.
+ */
+export function drawMarchManAtArms(
+  ctx: CanvasRenderingContext2D,
+  gait: number,
+  fighting: boolean,
+  resting: boolean,
+): void {
+  const swing = Math.sin(gait * 0.44);
+
+  ctx.save();
+  ctx.scale(1.38, 1.38);
+  ctx.lineCap = 'round';
+
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.42)';
+  ctx.beginPath();
+  ctx.ellipse(0.6, 1.9, 5.6, 4.5, 0, 0, TAU);
+  ctx.fill();
+
+  ctx.strokeStyle = '#3a3324';
+  ctx.lineWidth = 1.6;
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(-0.8, side * 1.7);
+    ctx.lineTo(-0.8 + swing * side * 2.1, side * 3.8);
+    ctx.stroke();
+  }
+
+  // Green jack over a mail shirt.
+  const jack = ctx.createLinearGradient(-4, -4, 3, 4);
+  jack.addColorStop(0, MARCH_LIGHT);
+  jack.addColorStop(1, MARCH_DARK);
+  ctx.fillStyle = jack;
+  ctx.strokeStyle = 'rgba(14, 18, 8, 0.8)';
+  ctx.lineWidth = 0.55;
+  ctx.beginPath();
+  ctx.ellipse(-1, 0, 4.3, 3.7, 0, 0, TAU);
+  ctx.fill();
+  ctx.stroke();
+
+  // Mail showing at the shoulders.
+  ctx.fillStyle = 'rgba(150, 156, 162, 0.55)';
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.ellipse(-0.2, side * 3.2, 1.5, 1.1, side * 0.3, 0, TAU);
+    ctx.fill();
+  }
+
+  // Small round buckler on the off hand.
+  ctx.fillStyle = '#7c6a4a';
+  ctx.strokeStyle = 'rgba(20, 14, 8, 0.85)';
+  ctx.lineWidth = 0.55;
+  ctx.beginPath();
+  ctx.arc(1.6, -3.4, 2.3, 0, TAU);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(220, 216, 200, 0.7)';
+  ctx.beginPath();
+  ctx.arc(1.6, -3.4, 0.7, 0, TAU);
+  ctx.fill();
+
+  // Open kettle helm.
+  ctx.fillStyle = '#9aa0a8';
+  ctx.beginPath();
+  ctx.arc(1.2, 0, 2.4, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(18, 18, 20, 0.8)';
+  ctx.lineWidth = 0.5;
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(24, 20, 14, 0.45)';
+  ctx.beginPath();
+  ctx.arc(1.2, 0, 2.4, Math.PI * 0.42, Math.PI * 1.58);
+  ctx.fill();
+
+  // Sword: cutting side to side while fighting, lowered at the post.
+  const swingArc = fighting ? Math.sin(performance.now() * 0.011) * 0.8 : 0;
+  const reach = resting ? 5.2 : 8.6;
+  ctx.save();
+  ctx.rotate(resting ? -0.95 : swingArc);
+  ctx.strokeStyle = '#4a3520';
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.moveTo(2.4, 2.7);
+  ctx.lineTo(4.2, 2.4);
+  ctx.stroke();
+  const blade = ctx.createLinearGradient(4.2, 0, reach, 0);
+  blade.addColorStop(0, '#cfd4da');
+  blade.addColorStop(1, '#8d949c');
+  ctx.strokeStyle = blade;
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.moveTo(4.2, 2.4);
+  ctx.lineTo(reach, 2.4);
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.restore();
+}
+
+/**
+ * A sword knight of the Marches: full plate under a green surcoat, longsword.
+ * The Kingdom's warhammer knight's opposite number — same harness, a blade
+ * instead of a hammer.
+ */
+export function drawMarchSwordKnight(
+  ctx: CanvasRenderingContext2D,
+  gait: number,
+  fighting: boolean,
+  resting: boolean,
+): void {
+  const swing = Math.sin(gait * 0.36);
+
+  ctx.save();
+  ctx.scale(1.45, 1.45);
+  ctx.lineCap = 'round';
+
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.48)';
+  ctx.beginPath();
+  ctx.ellipse(0.7, 2.2, 6.6, 5.1, 0, 0, TAU);
+  ctx.fill();
+
+  ctx.strokeStyle = '#2c2c30';
+  ctx.lineWidth = 2;
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(-0.7, side * 2);
+    ctx.lineTo(-0.7 + swing * side * 1.6, side * 4.2);
+    ctx.stroke();
+  }
+
+  const plate = ctx.createLinearGradient(-5, -5, 3.5, 5);
+  plate.addColorStop(0, '#aab0ba');
+  plate.addColorStop(0.5, '#6b7078');
+  plate.addColorStop(1, '#33363c');
+  ctx.fillStyle = plate;
+  ctx.strokeStyle = 'rgba(10, 11, 13, 0.85)';
+  ctx.lineWidth = 0.6;
+  ctx.beginPath();
+  ctx.ellipse(-0.9, 0, 4.9, 4.3, 0, 0, TAU);
+  ctx.fill();
+  ctx.stroke();
+
+  const surcoat = ctx.createLinearGradient(-4, -3, 1, 3);
+  surcoat.addColorStop(0, MARCH_LIGHT);
+  surcoat.addColorStop(1, MARCH_DARK);
+  ctx.fillStyle = surcoat;
+  ctx.beginPath();
+  ctx.ellipse(-1.4, 0, 3.2, 3.4, 0, 0, TAU);
+  ctx.fill();
+
+  ctx.fillStyle = '#7a808a';
+  ctx.strokeStyle = 'rgba(10, 11, 13, 0.8)';
+  ctx.lineWidth = 0.5;
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.ellipse(0.4, side * 3.6, 2, 1.7, side * 0.3, 0, TAU);
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  // Great helm with a green crest.
+  ctx.fillStyle = '#8a8f97';
+  ctx.beginPath();
+  ctx.arc(1.2, 0, 2.9, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(14, 15, 18, 0.85)';
+  ctx.lineWidth = 0.55;
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(10, 9, 8, 0.85)';
+  ctx.fillRect(2.2, -1.9, 1.4, 0.6);
+  ctx.fillRect(2.6, -0.35, 1.6, 0.7);
+  ctx.fillStyle = MARCH_LIGHT;
+  ctx.fillRect(-0.6, -0.45, 2.4, 0.9);
+
+  // Longsword, two-handed, swept round while fighting.
+  const swingArc = fighting ? Math.sin(performance.now() * 0.0095) * 0.9 : 0;
+  const reach = resting ? 6 : 11.5;
+  ctx.save();
+  ctx.rotate(resting ? -0.85 : swingArc);
+  ctx.strokeStyle = '#3f2e1b';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(2.6, 2.2);
+  ctx.lineTo(4.8, 1.9);
+  ctx.stroke();
+  ctx.strokeStyle = '#7a6844';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(5, 0.3);
+  ctx.lineTo(5, 3.5);
+  ctx.stroke();
+  const blade = ctx.createLinearGradient(5, 0, reach, 0);
+  blade.addColorStop(0, '#dde2e8');
+  blade.addColorStop(1, '#8d949c');
+  ctx.strokeStyle = blade;
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(5, 1.9);
+  ctx.lineTo(reach, 1.9);
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.restore();
+}
+
+/**
+ * A lancer: heavy horse, harness, and a lance couched under the arm. Longer
+ * reach than anything else on the board, which is the point of him.
+ */
+export function drawMarchLancer(
+  ctx: CanvasRenderingContext2D,
+  gait: number,
+  fighting: boolean,
+  resting: boolean,
+): void {
+  const jab = fighting ? Math.sin(performance.now() * 0.013) * 1.6 : 0;
+
+  ctx.save();
+  ctx.scale(1.5, 1.5);
+  drawHorse(ctx, gait, '#6b5f4e', '#2b2419');
+
+  // Green caparison fore and aft, kept narrow so the horse still reads.
+  ctx.fillStyle = 'rgba(96, 124, 62, 0.9)';
+  ctx.beginPath();
+  ctx.ellipse(6, -0.5, 2.9, 2.5, -0.2, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(58, 78, 36, 0.85)';
+  ctx.beginPath();
+  ctx.ellipse(-6.2, 0.6, 3, 2.6, 0.1, 0, TAU);
+  ctx.fill();
+
+  ctx.save();
+  ctx.translate(-0.5, -3.8);
+  ctx.lineCap = 'round';
+
+  const harness = ctx.createLinearGradient(-2.8, -2.8, 2.2, 2.8);
+  harness.addColorStop(0, '#9aa0a8');
+  harness.addColorStop(1, '#43484f');
+  ctx.fillStyle = harness;
+  ctx.strokeStyle = 'rgba(10, 11, 13, 0.85)';
+  ctx.lineWidth = 0.55;
+  ctx.beginPath();
+  ctx.ellipse(-0.7, 0, 3.6, 3.1, 0, 0, TAU);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = MARCH_DARK;
+  ctx.beginPath();
+  ctx.ellipse(-1.3, 0, 2.3, 2.4, 0, 0, TAU);
+  ctx.fill();
+
+  ctx.fillStyle = '#9aa0a8';
+  ctx.beginPath();
+  ctx.arc(1, 0, 2.4, 0, TAU);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#4a4f57';
+  ctx.beginPath();
+  ctx.arc(1, 0, 2.4, Math.PI * 0.4, Math.PI * 1.6);
+  ctx.fill();
+
+  // The lance: couched and levelled, or upright at the post.
+  ctx.save();
+  ctx.rotate(resting ? -1.15 : 0);
+  const reach = 21 + jab;
+  ctx.strokeStyle = '#5c4527';
+  ctx.lineWidth = 1.15;
+  ctx.beginPath();
+  ctx.moveTo(-4.6, 1.5);
+  ctx.lineTo(reach - 2.4, -1.3);
+  ctx.stroke();
+  // Vamplate, the guard over the grip.
+  ctx.fillStyle = '#8d949c';
+  ctx.beginPath();
+  ctx.ellipse(-1.6, 0.6, 1.1, 1.5, -0.15, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = '#d5dae0';
+  ctx.beginPath();
+  ctx.moveTo(reach, -1.45);
+  ctx.lineTo(reach - 3, -2.3);
+  ctx.lineTo(reach - 3, -0.35);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  ctx.restore();
+  ctx.restore();
+}
+
+/**
+ * The Flail Guard on his post: a man with a spiked ball on a chain, whirling
+ * it ready for whatever comes round the corner.
+ *
+ * Drawn live rather than baked, like the rock thrower, so the swing turns to
+ * face its target. `recoil` runs 1 to 0 just after a strike.
+ */
+export function drawFlailGuard(ctx: CanvasRenderingContext2D, radius: number, recoil: number): void {
+  ctx.save();
+  ctx.scale(radius / 13, radius / 13);
+  ctx.lineCap = 'round';
+
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+  ctx.beginPath();
+  ctx.ellipse(0.6, 1.8, 5.6, 4.6, 0, 0, TAU);
+  ctx.fill();
+
+  // Braced stance, feet apart.
+  ctx.strokeStyle = '#3a3324';
+  ctx.lineWidth = 1.7;
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(-0.8, side * 1.8);
+    ctx.lineTo(-2.2, side * 4);
+    ctx.stroke();
+  }
+
+  const jack = ctx.createLinearGradient(-4, -4, 3, 4);
+  jack.addColorStop(0, MARCH_LIGHT);
+  jack.addColorStop(1, MARCH_DARK);
+  ctx.fillStyle = jack;
+  ctx.strokeStyle = 'rgba(14, 18, 8, 0.8)';
+  ctx.lineWidth = 0.6;
+  ctx.beginPath();
+  ctx.ellipse(-1, 0, 4.5, 3.9, 0, 0, TAU);
+  ctx.fill();
+  ctx.stroke();
+
+  // Plate at the shoulders — he is medium armour, not light.
+  ctx.fillStyle = '#7f858d';
+  ctx.strokeStyle = 'rgba(12, 12, 14, 0.8)';
+  ctx.lineWidth = 0.5;
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.ellipse(-0.2, side * 3.4, 1.8, 1.4, side * 0.3, 0, TAU);
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = '#9aa0a8';
+  ctx.beginPath();
+  ctx.arc(1.2, 0, 2.5, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(18, 18, 20, 0.8)';
+  ctx.lineWidth = 0.5;
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(24, 20, 14, 0.5)';
+  ctx.beginPath();
+  ctx.arc(1.2, 0, 2.5, Math.PI * 0.42, Math.PI * 1.58);
+  ctx.fill();
+
+  // The flail: coiled overhead between blows, snapped forward as it strikes,
+  // so the post reads as wound up rather than idle.
+  const swing = performance.now() * 0.009;
+  const out = 4.6 + recoil * 5.2;
+  const angle = recoil > 0 ? 0 : Math.sin(swing) * 0.9;
+  const hx = 2 + Math.cos(angle) * out;
+  const hy = Math.sin(angle) * out;
+
+  ctx.strokeStyle = 'rgba(170, 168, 178, 0.8)';
+  ctx.lineWidth = 0.55;
+  ctx.setLineDash([0.9, 0.8]);
+  ctx.beginPath();
+  ctx.moveTo(2.6, 1.4);
+  ctx.lineTo(hx, hy);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  const ball = ctx.createRadialGradient(hx - 0.6, hy - 0.6, 0.3, hx, hy, 2.1);
+  ball.addColorStop(0, '#9a97a3');
+  ball.addColorStop(1, '#2f2d36');
+  ctx.fillStyle = ball;
+  ctx.beginPath();
+  ctx.arc(hx, hy, 1.9, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(10, 9, 12, 0.85)';
+  ctx.lineWidth = 0.35;
+  ctx.stroke();
+
+  ctx.strokeStyle = '#c2bfcb';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * TAU + swing;
+    ctx.beginPath();
+    ctx.moveTo(hx + Math.cos(a) * 1.6, hy + Math.sin(a) * 1.6);
+    ctx.lineTo(hx + Math.cos(a) * 3, hy + Math.sin(a) * 3);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
 /**
  * A field hospital: an open-fronted marquee with the wounded laid out inside,
  * a physician working over them, and the camp that comes with it.
@@ -3433,6 +3841,45 @@ export function drawArrow(ctx: CanvasRenderingContext2D): void {
 }
 
 /** A rough stone, drawn centred on the origin. */
+/**
+ * The head of a flail, mid-swing, with a length of chain trailing back towards
+ * the man who threw it. The "projectile" is on screen for barely a tenth of a
+ * second at the Flail Guard's speed, which is exactly the point: it reads as
+ * the ball lashing out and coming back rather than as something thrown.
+ */
+export function drawFlailHead(ctx: CanvasRenderingContext2D, radius: number): void {
+  // Chain, trailing behind the direction of travel.
+  ctx.strokeStyle = 'rgba(168, 166, 176, 0.75)';
+  ctx.lineWidth = radius * 0.28;
+  ctx.setLineDash([radius * 0.5, radius * 0.42]);
+  ctx.beginPath();
+  ctx.moveTo(-radius * 4.5, 0);
+  ctx.lineTo(-radius * 0.8, 0);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  const ball = ctx.createRadialGradient(-radius * 0.35, -radius * 0.35, radius * 0.15, 0, 0, radius);
+  ball.addColorStop(0, '#9a97a3');
+  ball.addColorStop(1, '#33313a');
+  ctx.fillStyle = ball;
+  ctx.beginPath();
+  ctx.arc(0, 0, radius, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(10, 9, 12, 0.85)';
+  ctx.lineWidth = radius * 0.16;
+  ctx.stroke();
+
+  ctx.strokeStyle = '#c2bfcb';
+  ctx.lineWidth = radius * 0.24;
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * TAU;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * radius * 0.85, Math.sin(a) * radius * 0.85);
+    ctx.lineTo(Math.cos(a) * radius * 1.65, Math.sin(a) * radius * 1.65);
+    ctx.stroke();
+  }
+}
+
 export function drawBoulder(ctx: CanvasRenderingContext2D, radius: number): void {
   ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
   ctx.beginPath();

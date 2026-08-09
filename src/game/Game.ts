@@ -83,6 +83,13 @@ const LANE_SPREAD = 0.58;
 /** Click grace around a fighter out on the road. He is small and he moves. */
 const FIGHTER_PICK_RADIUS = 14;
 
+/**
+ * How long a shooting enemy stands still to take its shot. It walks for the
+ * rest of the reload, so it always makes ground down the road — see
+ * `Game.bombardTowers`.
+ */
+const BOMBARD_AIM_TIME = 0.5;
+
 export type GameState = 'idle' | 'wave' | 'gameover' | 'victory';
 
 /**
@@ -229,6 +236,20 @@ export class Game {
   /** How much of his health a melee fighter binds up between waves. */
   get meleeRecovery(): number {
     return this.nationDef.traits?.meleeRecovery ?? DEFAULT_MELEE_RECOVERY;
+  }
+
+  /**
+   * What this nation actually pays for a building. Every price shown and every
+   * price charged goes through here, so a nation discount cannot be honoured
+   * in one place and forgotten in another.
+   */
+  costOf(def: TowerDef): number {
+    return Math.round(def.cost * (this.nationDef.traits?.costs?.[def.id] ?? 1));
+  }
+
+  /** The same, for a technology. */
+  techCostOf(tech: TechDef): number {
+    return Math.round(tech.cost * (this.nationDef.traits?.costs?.[tech.id] ?? 1));
   }
 
   /** Switching nation changes what can be built, so the board has to start over. */
@@ -413,8 +434,17 @@ export class Game {
       }
       if (!best) continue;
 
-      // Halted to shoot: it is not walking while it does this.
-      creep.bombarding = true;
+      /*
+       * It halts to *loose*, and only for as long as that takes — then it
+       * shoulders the bow and walks on until the next shot is ready.
+       *
+       * This has to be a brief pause rather than "stop while a target is in
+       * range", which is what it was at first and which soft-locked the game:
+       * six bowmen parked out of reach of anything that could kill them,
+       * whittling at an emplacement a hospital was mending just as fast, and
+       * the wave simply never ended. A besieger must always make ground.
+       */
+      creep.bombarding = creep.bombardCooldown <= BOMBARD_AIM_TIME;
       if (creep.bombardCooldown > 0) continue;
 
       best.takeBuildingHit(gun.damage, gun.type);
@@ -633,6 +663,7 @@ export class Game {
       gold: this.gold,
       techs: this.techs,
       housingFree: this.housingFree,
+      costOf: (def: TowerDef) => this.costOf(def),
     };
   }
 
@@ -651,7 +682,7 @@ export class Game {
     const def = towerDef(this.selectedTowerId);
     if (checkPlacement(this.placementWorld, def, x, y) !== 'ok') return false;
 
-    this.gold -= def.cost;
+    this.gold -= this.costOf(def);
 
     if (def.placement === 'path') {
       // Snap the gatehouse onto the road and square it across the route.
@@ -819,7 +850,7 @@ export class Game {
     const def = towerDef(lot.accepts as TowerId);
     if (def.requiresTech && !this.techs.has(def.requiresTech)) return 'Needs research';
     if ((def.housing ?? 0) > this.housingFree) return 'No housing';
-    if (this.gold < def.cost) return 'Not enough gold';
+    if (this.gold < this.costOf(def)) return 'Not enough gold';
     return null;
   }
 
@@ -829,7 +860,7 @@ export class Game {
     if (this.towers.some((t) => Math.hypot(t.x - lot.x, t.y - lot.y) < 4)) return false;
 
     const def = towerDef(lot.accepts as TowerId);
-    this.gold -= def.cost;
+    this.gold -= this.costOf(def);
     const tower = this.raise(def, lot.x, lot.y, true);
     this.towers.push(tower);
     this.selected = tower;
@@ -920,10 +951,10 @@ export class Game {
     // once `housingUsed` began counting emplacements — before that they were
     // free, and without it you can overdraw housing and strand the realm.
     if ((def.housing ?? 0) > this.housingFree) return false;
-    if (this.gold < def.cost) return false;
+    if (this.gold < this.costOf(def)) return false;
 
     const spot = gate.slotPosition(index);
-    this.gold -= def.cost;
+    this.gold -= this.costOf(def);
     const tower = this.raise(def, spot.x, spot.y);
     gate.slots[index] = tower;
     // Keep the player on the thing they just built.
@@ -1043,7 +1074,7 @@ export class Game {
       if (!this.techs.has(id)) return `Needs ${TECHS[id as TechId]?.name ?? id}`;
     }
     if (!this.hasResearchBuilding) return "Needs a Scholars' Hall";
-    if (this.gold < tech.cost) return 'Not enough gold';
+    if (this.gold < this.techCostOf(tech)) return 'Not enough gold';
     return null;
   }
 
@@ -1052,7 +1083,7 @@ export class Game {
     const tech = TECHS[id as TechId];
     if (!tech || this.researchBlocker(tech)) return false;
 
-    this.gold -= tech.cost;
+    this.gold -= this.techCostOf(tech);
     this.techs.add(tech.id);
     return true;
   }

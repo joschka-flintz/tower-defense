@@ -220,6 +220,56 @@ const STRATEGIES: Record<NationId, Strategy> = {
   },
 
   /**
+   * **A first sketch, not a tuned plan.** The Marches roster is brand new and
+   * has never been balance-tested; this list exists so the harness runs and
+   * reports *something*, and its shape is a guess: cheap men-at-arms early,
+   * longbows behind them for coverage, a flail guard for the wave-6 armour,
+   * then knights and catapults.
+   *
+   * It also does not know the two things that actually matter for this realm —
+   * that a Flail Guard is worth several times as much on an inside corner as
+   * on a straight, and that a hospital covering the shooting line is what
+   * keeps it alive. Expect it to under-perform a human badly.
+   */
+  marches: {
+    hallFromWave: 5,
+    techOrder: [
+      // Cheap for this realm, and its hospitals do double duty.
+      { id: 'field-medicine', fromWave: 5 },
+      { id: 'advanced-construction', fromWave: 8 },
+      { id: 'husbandry', fromWave: 10 },
+      { id: 'marksmanship', fromWave: 12 },
+      { id: 'ballistics', fromWave: 14 },
+      { id: 'fire-projectiles', fromWave: 17 },
+    ],
+    plan: [
+      { tower: 'hospital', count: 1, fromWave: 6 },
+      { tower: 'catapult', count: 1, fromWave: 9 },
+      { tower: 'hospital', count: 2, fromWave: 12 },
+
+      { tower: 'men-at-arms', count: 4 },
+      { tower: 'longbowman', count: 2 },
+      { tower: 'men-at-arms', count: 6, fromWave: 2 },
+      { tower: 'longbowman', count: 4, fromWave: 3 },
+      { tower: 'flail-guard', count: 2, fromWave: 4 },
+      { tower: 'men-at-arms', count: 8, fromWave: 5 },
+      { tower: 'flail-guard', count: 3, fromWave: 6 },
+      { tower: 'longbowman', count: 6, fromWave: 7 },
+      { tower: 'sword-knight', count: 1, fromWave: 8 },
+      { tower: 'catapult', count: 2, fromWave: 10 },
+      { tower: 'lancer', count: 1, fromWave: 11 },
+      { tower: 'flail-guard', count: 5, fromWave: 11 },
+      { tower: 'sword-knight', count: 2, fromWave: 12 },
+      { tower: 'longbowman', count: 9, fromWave: 13 },
+      { tower: 'catapult', count: 3, fromWave: 14 },
+      { tower: 'lancer', count: 3, fromWave: 15 },
+      { tower: 'men-at-arms', count: 12, fromWave: 16 },
+      { tower: 'sword-knight', count: 4, fromWave: 17 },
+      { tower: 'catapult', count: 5, fromWave: 18 },
+    ],
+  },
+
+  /**
    * Placeholder. The Wardens' roster has not been designed yet, so this is
    * only enough of a list to make the harness run against them and report a
    * number — do not read it as an intended build order.

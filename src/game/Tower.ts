@@ -364,32 +364,45 @@ export class Tower implements DamageSource {
   /**
    * Patching the emplacement back up, from two possible sources.
    *
-   * A siege engine's own crew can do it, but only by stopping work on the
-   * engine — once it drops below `retreatAt` it stands down entirely and mends
-   * until it is whole again, exactly as a wounded fighter falls back and only
-   * returns once fit. Anything else has to be inside a field hospital's reach,
-   * and keeps shooting while the surgeons work on it.
+   * **Being worked on means not shooting**, whichever source is doing it. You
+   * cannot span the frame of an engine and crank it at the same time, and the
+   * surgeons cannot dress a crossbowman's arm while he spans his bow. That is
+   * the whole cost of repair, and it is what stops a hospital simply making a
+   * line of emplacements unkillable.
+   *
+   * The two sources differ in when they start. A siege engine's own crew waits
+   * until the damage is bad enough to be worth downing tools for (`retreatAt`)
+   * and then works until the engine is whole — so it cannot flicker in and out
+   * of action over a single point of damage. A hospital starts on anything
+   * hurt at all, but heals fast, so the pause is brief.
    */
   private updateRepairs(dt: number, ctx: TowerContext): void {
     if (!this.isShootable) return;
 
+    if (this.buildingHp >= this.stats.buildingHp) {
+      this.repairing = false;
+      return;
+    }
+
     if (this.stats.selfRepair > 0) {
-      // Below the threshold it downs tools; it does not pick them up again
-      // until it is whole, so this cannot flicker in and out of action.
       if (this.buildingHealthFraction < this.stats.retreatAt) this.repairing = true;
       if (this.repairing) {
         this.mend(this.stats.selfRepair * dt);
         if (this.buildingHp >= this.stats.buildingHp) this.repairing = false;
+        return;
       }
     }
-
-    if (this.buildingHp >= this.stats.buildingHp) return;
 
     for (const ward of ctx.hospitals) {
       if (dist2(this.x, this.y, ward.x, ward.y) > ward.range * ward.range) continue;
       this.mend(ward.healRate * dt);
-      break;
+      // Under the surgeons' hands, and so not at his post.
+      this.repairing = this.buildingHp < this.stats.buildingHp;
+      return;
     }
+
+    // Hurt, but nobody is working on it — back to the parapet.
+    this.repairing = false;
   }
 
   private updateFighters(dt: number, ctx: TowerContext): void {

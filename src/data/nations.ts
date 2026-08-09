@@ -13,7 +13,7 @@
 
 import type { TowerId } from './towers';
 
-export type NationId = 'kingdom' | 'wardens';
+export type NationId = 'kingdom' | 'marches' | 'wardens';
 
 /**
  * Rules that bend for one nation only.
@@ -26,8 +26,21 @@ export interface NationTraits {
   /**
    * Fraction of his maximum health a melee fighter binds up between waves.
    * The game-wide default is 0.5 (`DEFAULT_MELEE_RECOVERY` in `Tower.ts`).
+   *
+   * Applies to *fighters* only. A shot-up emplacement mends at the same rate
+   * for everybody — see `Tower.updateRepairs`.
    */
   meleeRecovery?: number;
+
+  /**
+   * Price multipliers, keyed by tower id **or** technology id. 0.6 means this
+   * nation pays 60% of the listed price. Anything not named costs full price.
+   *
+   * Every price the player ever sees or pays goes through `Game.costOf` and
+   * `Game.techCostOf`, so a discount cannot be honoured in the shop and
+   * forgotten at the till.
+   */
+  costs?: Readonly<Record<string, number>>;
 }
 
 export interface NationDef {
@@ -59,18 +72,17 @@ export const NATIONS = {
   kingdom: {
     id: 'kingdom',
     name: 'The Kingdom',
-    blurb: 'Men-at-arms, stone walls and siege engines. Holds the road by standing in it.',
+    blurb: 'Men-at-arms and stone walls. Makes the enemy stop, then stands in the road with them.',
     towers: [
       'pikeman',
       'swordsman',
       'crossbow',
       // Also installable in a gatehouse turret, but the Kingdom can raise one
-      // in the open field too — it is the only cheap blunt damage it has
-      // before the catapult, and blunt is what armour forces on it.
+      // in the open field too — it is the only blunt damage it has, and blunt
+      // is what armour forces on it.
       'rock-thrower',
       'heavy-knight',
       'mounted-knight',
-      'catapult',
       'house',
       'farm',
       'hospital',
@@ -91,9 +103,60 @@ export const NATIONS = {
   },
 
   /**
-   * Not finished. Everything the Kingdom gave up is parked here so it stays
-   * in the game and keeps type-checking: bows, hounds, and whatever else the
-   * second nation ends up being built around.
+   * The border country: the other melee realm, and the Kingdom's opposite
+   * number in almost every respect.
+   *
+   * Where the Kingdom makes the enemy *stop* — a gate across the road, short
+   * weapons, blunt for the armour that follows — the Marches never stop
+   * anybody. They have no gatehouse at all. Instead they reach: the longest
+   * bow in the game, a catapult, and riders with a long leash, backed by a
+   * flail emplacement tucked into a corner for the armour their slash and
+   * pierce cannot answer.
+   *
+   * The gatehouse/catapult split is the whole point of the pair. Having both
+   * — a wall that halts a crowd *and* the artillery to shell it while it
+   * stands there — was the single strongest thing in the game, and giving
+   * each realm one of the two is what stops them playing the same way.
+   */
+  marches: {
+    id: 'marches',
+    name: 'The Marches',
+    blurb: 'Longbows, lances and the open field. Never stops the enemy — reaches them first.',
+    towers: [
+      'men-at-arms',
+      'longbowman',
+      'flail-guard',
+      'sword-knight',
+      'lancer',
+      'catapult',
+      'house',
+      'farm',
+      'hospital',
+    ],
+    // No gatehouse, so nothing to install in one.
+    gateSlots: [],
+    lotBuildings: ['research'],
+    traits: {
+      // The Marches keep hospitals the way other realms keep granaries — the
+      // borderers have been patching each other up for generations. This is
+      // the counterweight to a roster whose shooting line can be shot at:
+      // cheap medicine is what lets them afford the hospitals that keep those
+      // emplacements standing.
+      costs: { 'field-medicine': 0.55, hospital: 0.7 },
+    },
+    perks: [
+      'Field Medicine costs 45% less, and a Field Hospital 30% less.',
+      'No Stone Gatehouse — nothing here stops the enemy walking.',
+    ],
+    // The roster exists and runs; none of it has been balanced against the
+    // wave table yet.
+    playable: false,
+  },
+
+  /**
+   * Not finished. Everything neither kingdom fields is parked here so it stays
+   * in the game and keeps type-checking: bows, hounds, and whatever else a
+   * third nation ends up being built around.
    */
   wardens: {
     id: 'wardens',
@@ -106,7 +169,7 @@ export const NATIONS = {
   },
 } as const satisfies Record<NationId, NationDef>;
 
-export const NATION_ORDER: NationId[] = ['kingdom', 'wardens'];
+export const NATION_ORDER: NationId[] = ['kingdom', 'marches', 'wardens'];
 
 /** The nation a new game starts as, until a pre-game chooser exists. */
 export const DEFAULT_NATION: NationId = 'kingdom';

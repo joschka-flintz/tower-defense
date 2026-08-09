@@ -142,6 +142,10 @@ export interface TowerDef {
     | 'pikeman'
     | 'heavy-knight'
     | 'mounted-knight'
+    | 'men-at-arms'
+    | 'sword-knight'
+    | 'lancer'
+    | 'flail-guard'
     | 'hospital'
     | 'house'
     | 'farm';
@@ -159,7 +163,7 @@ export interface TowerDef {
   damage?: number;
   fireRate?: number;
   projectileSpeed?: number;
-  projectileShape?: 'arrow' | 'boulder';
+  projectileShape?: 'arrow' | 'boulder' | 'flail';
   /**
    * A lobbed shot, aimed at a patch of ground rather than at the enemy: it
    * lands where it was aimed whatever the target does afterwards, so quick
@@ -693,6 +697,348 @@ export const TOWERS = {
         cost: 200,
         requires: ['sabre'],
         stats: { whirlwindDamage: 34, whirlwindRadius: 56, whirlwindInterval: 2.5 },
+      },
+    ],
+  },
+
+  /*
+   * ------------------------------------------------------------------------
+   * The Marches. Slash, pierce and one blunt emplacement, all of it reaching
+   * rather than blocking — this realm has no gatehouse and nothing that halts
+   * a crowd, so it has to kill things on the way in.
+   * ------------------------------------------------------------------------
+   */
+
+  /**
+   * The Marches' cheap body, and the mirror of the Kingdom's pikemen: two men
+   * to a post again, but with sword and buckler rather than a pike. Shorter
+   * reach and no formation, so they hold a narrower stretch — but they cut,
+   * and slash keeps far more of its bite against mail than pierce does.
+   *
+   * Lighter than a swordsman on purpose. He is a retained soldier in a mail
+   * shirt, not a knight's household man in a surcoat.
+   */
+  'men-at-arms': {
+    id: 'men-at-arms',
+    name: 'Men-at-Arms',
+    housing: 1,
+    food: 1,
+    blurb: 'Two swordsmen to a post. Cheap hold-points that cut rather than skewer.',
+    cost: 50,
+    radius: 13,
+    attack: 'melee',
+    visual: 'men-at-arms',
+    baseColor: '#5f7148',
+    // No pike, so a shorter leash than the Kingdom's equivalent.
+    range: 150,
+    turnSpeed: 7,
+    units: 2,
+    unitHp: 130,
+    unitDps: 24,
+    unitSpeed: 108,
+    retreatAt: 0.4,
+    armor: 'light',
+    damageType: 'slash',
+    upgrades: [
+      {
+        id: 'mail-shirts',
+        name: 'Mail Shirts',
+        description: 'Riveted mail under the jack. Health 130 to 200 each.',
+        cost: 85,
+        stats: { unitHp: 200 },
+      },
+      {
+        id: 'third-man',
+        name: 'Third Retainer',
+        description:
+          'A third man takes the post with them, with his own health — and needs no housing or food of his own.',
+        cost: 90,
+        requires: ['mail-shirts'],
+        stats: { units: 3 },
+      },
+      {
+        id: 'arming-swords',
+        name: 'Arming Swords',
+        description: 'Properly forged blades in place of falchions. Damage 24 to 38 per second each.',
+        cost: 100,
+        stats: { unitDps: 38 },
+      },
+      {
+        id: 'back-and-breast',
+        name: 'Back-and-Breast',
+        description:
+          'Plate over the mail, front and back. Medium armour — but the weight tells and they move slower.',
+        cost: 140,
+        requires: ['mail-shirts'],
+        stats: { armor: 'medium', unitSpeed: 88 },
+      },
+    ],
+  },
+
+  /**
+   * A flail on a chain, swung from a fixed post at whatever comes past.
+   *
+   * Mechanically a shooting emplacement with an absurdly short reach — the
+   * "shot" is the head of the flail lashing out and coming back. That reach is
+   * the whole design: it covers almost nothing from open ground, so it wants
+   * an inside corner where the road doubles back on itself and the same
+   * stretch passes it twice. Put it in a straight and it is wasted.
+   *
+   * It is also the Marches' only blunt damage, which is what makes finding it
+   * a corner worth doing at all: slash and pierce both fall apart on plate.
+   */
+  'flail-guard': {
+    id: 'flail-guard',
+    name: 'Flail Guard',
+    housing: 1,
+    food: 1,
+    blurb: 'Very short reach, never misses, blunt. Wants an inside corner — useless on a straight.',
+    cost: 85,
+    radius: 13,
+    attack: 'projectile',
+    visual: 'flail-guard',
+    baseColor: '#6a6470',
+    range: 95,
+    turnSpeed: 8,
+    damage: 44,
+    fireRate: 0.7,
+    projectileSpeed: 900,
+    projectileShape: 'flail',
+    projectileRadius: 4,
+    accuracy: 1,
+    damageType: 'blunt',
+    buildingHp: 220,
+    armor: 'medium',
+    upgrades: [
+      {
+        id: 'heavier-head',
+        name: 'Heavier Head',
+        description: 'A bigger ball on a shorter haft. Damage 44 to 72.',
+        cost: 130,
+        stats: { damage: 72 },
+      },
+      {
+        id: 'spiked-head',
+        name: 'Spiked Head',
+        description:
+          'Flanges welded round the ball. The blow carries through to anything standing close by.',
+        cost: 180,
+        requires: ['heavier-head'],
+        stats: { splashRadius: 32 },
+      },
+      {
+        id: 'longer-chain',
+        name: 'Longer Chain',
+        description: 'Another two feet of chain. Reach 95 to 135 — enough to matter on a gentler corner.',
+        cost: 110,
+        stats: { range: 135 },
+      },
+      {
+        id: 'second-flail',
+        name: 'Second Flail',
+        description: 'One in each hand, swung alternately. Strikes far more often.',
+        cost: 150,
+        stats: { fireRate: 1.1 },
+      },
+    ],
+  },
+
+  /**
+   * The longest reach in the game by a wide margin, and the least damage per
+   * arrow to pay for it.
+   *
+   * Where the Wardens' archer is a good tower, this is a *coverage* tower:
+   * one of these watches a stretch of road three others could not, and its
+   * worth is measured in how long an enemy spends inside it rather than in
+   * what any single shaft does. It is drawn as an archer because that is what
+   * it is; the two never appear in the same game.
+   */
+  longbowman: {
+    id: 'longbowman',
+    name: 'Longbowman',
+    housing: 1,
+    food: 1,
+    blurb: 'Enormous reach, feeble arrows. Buys time under fire rather than kills.',
+    cost: 55,
+    radius: 13,
+    attack: 'projectile',
+    visual: 'archer',
+    baseColor: '#4f6b3a',
+    range: 300,
+    turnSpeed: 9,
+    damage: 12,
+    fireRate: 0.75,
+    projectileSpeed: 560,
+    projectileShape: 'arrow',
+    projectileRadius: 3,
+    accuracy: 0.78,
+    damageType: 'pierce',
+    buildingHp: 130,
+    armor: 'unarmored',
+    upgrades: [
+      {
+        id: 'war-bow',
+        name: 'War Bow',
+        description: 'A heavier stave and a longer draw. Damage 12 to 22.',
+        cost: 95,
+        stats: { damage: 22 },
+      },
+      {
+        id: 'arrow-storm',
+        name: 'Arrow Storm',
+        description: 'Loosing on the count rather than aiming each shaft. Shoots far more often.',
+        cost: 120,
+        stats: { fireRate: 1.15 },
+      },
+      {
+        id: 'ranging-marks',
+        name: 'Ranging Marks',
+        description:
+          'Stakes driven at known distances down the road. Reach 300 to 380, and a steadier aim.',
+        cost: 130,
+        stats: { range: 380, accuracy: 0.86 },
+      },
+      {
+        id: 'fire-arrows',
+        name: 'Fire Arrows',
+        description:
+          'Pitch-soaked heads. Fire damage, and the target keeps burning afterwards. Burns stack twice at most.',
+        cost: 90,
+        requiresTech: 'fire-projectiles',
+        stats: { damageType: 'fire', igniteDps: 6, igniteDuration: 4 },
+      },
+    ],
+  },
+
+  /**
+   * The Marches' heavy foot: full harness and a sword. The Kingdom's warhammer
+   * knight crushes, this one cuts — same plate, same price bracket, opposite
+   * answer. Slash is merely poor against plate rather than useless, so he is
+   * a good general soldier who is never the *right* one against a knight.
+   */
+  'sword-knight': {
+    id: 'sword-knight',
+    name: 'Sword Knight',
+    housing: 2,
+    food: 3,
+    blurb: 'Plate and a longsword. The anvil of the Marches line, and its best all-rounder.',
+    cost: 165,
+    radius: 15,
+    attack: 'melee',
+    visual: 'sword-knight',
+    baseColor: '#3d5a8a',
+    range: 145,
+    turnSpeed: 5,
+    units: 1,
+    unitHp: 400,
+    unitDps: 34,
+    unitSpeed: 66,
+    retreatAt: 0.4,
+    armor: 'heavy',
+    damageType: 'slash',
+    upgrades: [
+      {
+        id: 'great-helm',
+        name: 'Great Helm',
+        description: 'A fully enclosed helm over the coif. Health 400 to 600.',
+        cost: 150,
+        stats: { unitHp: 600 },
+      },
+      {
+        id: 'oath-sworn',
+        name: 'Sworn Oath',
+        description:
+          'He has sworn not to give ground. Health 600 to 800, and he holds down to 20% before falling back.',
+        cost: 220,
+        requires: ['great-helm'],
+        stats: { unitHp: 800, retreatAt: 0.2 },
+      },
+      {
+        id: 'honed-blade',
+        name: 'Honed Longsword',
+        description: 'A blade kept to a razor and a half-sword grip for the gaps. Damage 34 to 52 per second.',
+        cost: 145,
+        stats: { unitDps: 52 },
+      },
+      {
+        id: 'sweeping-cut',
+        name: 'Sweeping Cut',
+        description:
+          'A full turn of the blade every 3.2 seconds, opening up everything within reach rather than the man in front.',
+        cost: 210,
+        requires: ['honed-blade'],
+        stats: { whirlwindDamage: 38, whirlwindRadius: 48, whirlwindInterval: 3.2 },
+      },
+    ],
+  },
+
+  /**
+   * A knight on a warhorse with a couched lance — the Marches' pierce, and
+   * deliberately not a late-game armour-breaker.
+   *
+   * Pierce is the worst thing in the game to bring to a plate fight (40%), so
+   * making a heavy elite out of it needs care: his damage is set high enough
+   * that even at 40% he is worth his place, but what he is genuinely *for* is
+   * the light and unarmoured mass, where pierce is at its best and his long
+   * leash lets him ride out and meet it well before it reaches the line.
+   * Against the wave-6 knights, that is what the Flail Guard is for.
+   *
+   * Gated behind Husbandry — no stables, no cavalry.
+   */
+  lancer: {
+    id: 'lancer',
+    name: 'Lancer',
+    housing: 2,
+    food: 3,
+    blurb: 'Heavy horse with a couched lance. Rides far out to break the mass before it arrives.',
+    cost: 200,
+    radius: 16,
+    attack: 'melee',
+    visual: 'lancer',
+    baseColor: '#6a5a3e',
+    requiresTech: 'husbandry',
+    range: 215,
+    turnSpeed: 7,
+    units: 1,
+    unitHp: 380,
+    // High on purpose: pierce lands at 40% on the plate he will meet late, so
+    // a merely respectable figure here would make him useless by wave 12.
+    unitDps: 44,
+    unitSpeed: 120,
+    retreatAt: 0.35,
+    armor: 'heavy',
+    damageType: 'pierce',
+    upgrades: [
+      {
+        id: 'destrier',
+        name: 'Destrier',
+        description: 'A bred warhorse under the harness. Health 380 to 560.',
+        cost: 190,
+        stats: { unitHp: 560 },
+      },
+      {
+        id: 'bodkin-lance',
+        name: 'Bodkin Lance',
+        description:
+          'A needle head made to find the gaps in plate. Damage 44 to 66 per second — the answer to armour turning his point.',
+        cost: 165,
+        stats: { unitDps: 66 },
+      },
+      {
+        id: 'couched-charge',
+        name: 'Couched Charge',
+        description:
+          'He rides straight through the press every 2.8 seconds, running through everything he passes.',
+        cost: 200,
+        requires: ['bodkin-lance'],
+        stats: { whirlwindDamage: 30, whirlwindRadius: 58, whirlwindInterval: 2.8 },
+      },
+      {
+        id: 'swift-remount',
+        name: 'Spare Mounts',
+        description: 'A second horse kept saddled. He rides further out and gets there faster.',
+        cost: 150,
+        stats: { range: 265, unitSpeed: 152 },
       },
     ],
   },

@@ -38,6 +38,40 @@ renderer.render();
 await fetch('/__shot?name=check', { method: 'POST', body: canvas.toDataURL('image/png') });
 ```
 
+### Rolling back a change that did not work out
+
+The project is a **git repository**, and that is the fallback system. Every session's work should
+end in a commit, so any change can be undone wholesale.
+
+```bash
+git log --oneline
+```
+
+To look at what changed since the last known-good state:
+
+```bash
+git diff HEAD~1
+```
+
+To throw away everything uncommitted and go back to the last commit:
+
+```bash
+git restore .
+```
+
+To undo the last commit entirely, files and all:
+
+```bash
+git reset --hard HEAD~1
+```
+
+`node_modules/`, `dist/` and `.shots/` are ignored, so a reset never touches the installed packages
+or the screenshots.
+
+**Commit before starting anything large**, and say in the message what has and has not been tested.
+The whole point is that "this update did not work out" is one command, not an afternoon of undoing
+edits by hand.
+
 ### Balance testing
 
 There is now a headless harness. It plays a full twenty-wave game per nation with no browser and
@@ -132,6 +166,16 @@ If that ever needs reining in, the targeted fix is to make new fighters muster b
 available, not to ban building outright.
 
 ## Not balance-tested yet
+
+**The Marches — the entire nation.** Roster, prices, upgrades, the cost-discount perk, and the
+harness plan in `balance.ts` are all first drafts. The plan in particular knows neither of the two
+things that actually matter for this realm: that a Flail Guard is worth several times as much on an
+inside corner as on a straight, and that a hospital covering the shooting line is what keeps it
+alive. Expect it to under-perform a human badly.
+
+**The gatehouse/catapult split** moved the catapult off the Kingdom, which was balanced *with* it.
+The Kingdom's numbers are now stale too.
+
 
 The following all landed **without** a balance run, at the user's explicit request — a new nation
 and a change of tower composition are coming first, and tuning before that would be wasted. The
