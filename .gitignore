@@ -1,5 +1,7 @@
 node_modules/
 dist/
 .shots/
+# Vite's build cache. Regenerated on every dev run.
+.vite/
 *.local
 .DS_Store
