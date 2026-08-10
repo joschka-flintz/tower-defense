@@ -977,7 +977,19 @@ export class Renderer {
     } else if (tower.def.visual === 'crossbow') {
       drawCrossbowFigure(ctx, tower.def.radius * 1.35, tower.flash);
     } else if (tower.def.visual === 'flail-guard') {
-      drawFlailGuard(ctx, tower.def.radius, tower.flash, tower.stats.whirlwindRadius);
+      // Drawn *un*rotated: the head's position comes from the tower's own
+      // sweep angle, not from a turret facing, so the ball on screen is the
+      // ball the rules move. `range` minus the orbit is the head's reach.
+      ctx.rotate(-tower.angle);
+      drawFlailGuard(
+        ctx,
+        tower.def.radius,
+        tower.flash,
+        tower.stats.whirlwindRadius,
+        tower.flailAngle,
+        tower.stats.range - tower.stats.whirlwindRadius,
+      );
+      ctx.rotate(tower.angle);
     } else if (tower.def.visual === 'rock-thrower') {
       drawRockThrower(ctx, tower.def.radius, tower.flash);
     } else if (tower.def.visual === 'hot-oil') {

@@ -335,12 +335,14 @@ function combatPower(def: TowerDef, purchased: ReadonlySet<string>): number {
   }
 
   if (def.attack === 'sweep') {
-    // Hits everything in the circle rather than one thing, so the area is
-    // worth as much as the damage. Squared, because that is how the ground it
-    // covers actually grows.
+    // One blow per enemy per revolution, on whatever the head passes through.
+    // The ground it threatens is a *band* — the circumference of the circle —
+    // not the area inside it, so this scales with the radius rather than with
+    // its square. Getting that wrong is what made the first version look
+    // reasonable on paper while being absurd in play.
     if (s.whirlwindInterval <= 0) return 0;
     const perSecond = s.whirlwindDamage / s.whirlwindInterval;
-    return perSecond * (1 + (s.whirlwindRadius * s.whirlwindRadius) / 9000);
+    return perSecond * (1 + s.whirlwindRadius / 90);
   }
 
   if (def.attack === 'hound') {

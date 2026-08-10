@@ -129,7 +129,7 @@ Which of these you can build depends on your nation.
 | Men-at-Arms | 50 | Marches | The Marches' cheap body and the mirror of the Kingdom's pikemen: **two** to a post again, but sword and buckler rather than a pike. Shorter reach, no formation — but they cut, and slash keeps far more of its bite against mail than pierce does. Upgrades: mail shirts, a third retainer, arming swords, back-and-breast (→ medium armour, slower). |
 | Longbowman | 55 | Marches | Reach **300** — by far the longest in the game — and feeble arrows to pay for it. A coverage tower, not a killing one: its worth is how long an enemy spends under fire. Upgrades: war bow, arrow storm, ranging marks (→ 380), fire arrows. |
 | Shieldbearers | 75 | Marches | **Two** pikemen behind kite shields — the Marches' middle rank. Medium armour and a pike's reach, where its other foot are light or heavy with nothing between. Pierce, so it is the *worse* choice against plate than the men-at-arms beside it (40% against 55%) and the sturdier one against everything else. Upgrades: braced shields, third rank, long pikes, drilled wall. |
-| Flail Guard | 85 | Marches | Swings a morning star in a **full circle** and hits *everything* inside it at once — it picks no target at all. The circle is only 95 across, so it wants an inside corner where the road doubles back and the whole press walks through the same ground. On a straight it is wasted. The Marches' only blunt damage. Upgrades: heavier head, spiked head, longer chain (circle → 135), second flail. |
+| Flail Guard | 85 | Marches | Swings a morning star round and round on a chain. It picks **no target at all** — whatever the ball physically passes through is struck, as it passes, once per revolution. That makes it threaten a narrow *band* of ground at arm's length rather than a circle, so it wants an inside corner where the road doubles back through the ring. On a straight it is wasted. The Marches' only blunt damage. Upgrades: heavier head, spiked head, longer chain (sweeps wider), second flail (comes round faster). |
 | Sword Knight | 165 | Marches | Plate and a longsword — the warhammer knight's opposite number. Cuts instead of crushing, so he is a fine general soldier and never the *right* one against plate. Upgrades: great helm, sworn oath, honed longsword, sweeping cut. |
 | Lancer | 200 | Marches | Needs **Husbandry**. Heavy horse, couched lance, **pierce**. Rides far out (leash 215) to break the light and unarmoured mass before it arrives — pierce is at its best there and its worst against the plate that comes later, which is what the Flail Guard is for. Upgrades: destrier, bodkin lance, couched charge, spare mounts. |
 | Archer | 30 | Wardens | Stands on the ground with a small footprint, so you can **mass** them. Long reach, slow deliberate shots, 80% hit chance. Upgrades: a timber shooting platform (more range and aim, and he visibly stands on it), a heavier bow, and fire arrows. |
@@ -144,12 +144,18 @@ Which of these you can build depends on your nation.
 ### Sweep towers
 
 The Flail Guard is the only one, and it works unlike anything else on the board: it has **no
-target**. A timer turns the weapon in a full circle and every enemy standing inside takes the blow
-at once. The ring you can see on the ground is exactly the ring that gets hit.
+target**. The head goes round on a chain and hurts whatever it physically reaches, *as* it reaches
+it — so an enemy is struck when the ball gets to them, once per revolution, not when a timer fires.
+The ball you can see is the ball that hits; the game and the animation read the same angle.
 
-That is the whole reason a 95 reach is worth having. A single-target weapon that short would simply
-be a bad tower; one that hits *everything* that short is a reason to go hunting for the corner where
-the road doubles back on itself.
+The important consequence is that it threatens a narrow **band** of ground at arm's length, not a
+filled disc. Enemies standing in the middle of the circle, or beyond it, are perfectly safe. That is
+what makes a reach this short worth having at all: the job is to find the inside corner where the
+road doubles back and drops the whole column through that band.
+
+Measured beside a busy road in its best spot, it does about **twice** the work of a single-target
+tower of similar price — which is right for something that catches two where they catch one, given
+it also has half their range and only works in specific places.
 
 ### Melee posts
 

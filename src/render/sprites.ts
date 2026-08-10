@@ -1219,28 +1219,28 @@ export function drawFlailGuard(
   radius: number,
   recoil: number,
   sweepRadius: number,
+  spin: number,
+  headReach: number,
 ): void {
-  // The circle first, in world units, before the figure is scaled to his post.
-  const spin = performance.now() * 0.0022;
-
-  // The ring the ball travels, always faintly visible so the threatened ground
-  // is legible even between blows.
-  ctx.strokeStyle = `rgba(200, 196, 210, ${0.1 + recoil * 0.4})`;
-  ctx.lineWidth = 1 + recoil * 3;
+  // The head's path, faint but always there, so the ground it beats is legible
+  // between blows. Drawn in world units before the figure is scaled to his post.
+  ctx.strokeStyle = `rgba(200, 196, 210, ${0.09 + recoil * 0.28})`;
+  ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.arc(0, 0, sweepRadius, 0, TAU);
   ctx.stroke();
 
-  // A bright arc chasing the head round, so the direction of the swing reads.
-  ctx.strokeStyle = `rgba(226, 232, 240, ${0.15 + recoil * 0.55})`;
-  ctx.lineWidth = 2 + recoil * 4;
+  // A short trail behind the head, which is what makes the direction read.
+  ctx.strokeStyle = `rgba(226, 232, 240, ${0.12 + recoil * 0.4})`;
+  ctx.lineWidth = 2.5;
   ctx.beginPath();
-  ctx.arc(0, 0, sweepRadius, spin - 1.5, spin);
+  ctx.arc(0, 0, sweepRadius, spin - 0.9, spin);
   ctx.stroke();
 
-  // The chain, out to the head on the ring.
   const hx = Math.cos(spin) * sweepRadius;
   const hy = Math.sin(spin) * sweepRadius;
+
+  // The chain, from his hands out to the head.
   ctx.strokeStyle = 'rgba(172, 170, 182, 0.85)';
   ctx.lineWidth = 1.6;
   ctx.setLineDash([3, 2.6]);
@@ -1250,25 +1250,34 @@ export function drawFlailGuard(
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // The head itself, out on the ring where it can actually reach.
-  const headR = radius * 0.34;
-  const ball = ctx.createRadialGradient(hx - headR * 0.4, hy - headR * 0.4, headR * 0.2, hx, hy, headR);
-  ball.addColorStop(0, '#9a97a3');
-  ball.addColorStop(1, '#2f2d36');
+  /*
+   * The head, drawn at `headReach` — the radius the game actually strikes
+   * within. Sizing this off anything else would put the lie back: the ball on
+   * screen has to be the ball that hurts.
+   */
+  const ball = ctx.createRadialGradient(
+    hx - headReach * 0.3, hy - headReach * 0.3, headReach * 0.15,
+    hx, hy, headReach,
+  );
+  ball.addColorStop(0, '#a5a2ae');
+  ball.addColorStop(0.55, '#5d5a66');
+  ball.addColorStop(1, '#2a2830');
   ctx.fillStyle = ball;
   ctx.beginPath();
-  ctx.arc(hx, hy, headR, 0, TAU);
+  ctx.arc(hx, hy, headReach * 0.72, 0, TAU);
   ctx.fill();
-  ctx.strokeStyle = 'rgba(10, 9, 12, 0.85)';
-  ctx.lineWidth = 0.8;
+  ctx.strokeStyle = 'rgba(10, 9, 12, 0.9)';
+  ctx.lineWidth = 1;
   ctx.stroke();
-  ctx.strokeStyle = '#c2bfcb';
-  ctx.lineWidth = 1.1;
-  for (let i = 0; i < 6; i++) {
-    const a = (i / 6) * TAU + spin * 3;
+
+  // Flanges, reaching out to the true strike radius.
+  ctx.strokeStyle = '#c8c5d1';
+  ctx.lineWidth = 1.6;
+  for (let i = 0; i < 7; i++) {
+    const a = (i / 7) * TAU + spin * 2.5;
     ctx.beginPath();
-    ctx.moveTo(hx + Math.cos(a) * headR * 0.85, hy + Math.sin(a) * headR * 0.85);
-    ctx.lineTo(hx + Math.cos(a) * headR * 1.7, hy + Math.sin(a) * headR * 1.7);
+    ctx.moveTo(hx + Math.cos(a) * headReach * 0.62, hy + Math.sin(a) * headReach * 0.62);
+    ctx.lineTo(hx + Math.cos(a) * headReach, hy + Math.sin(a) * headReach);
     ctx.stroke();
   }
 

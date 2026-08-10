@@ -1,3 +1,4 @@
+import { TAU } from '../core/rng';
 import { angleDiff, dist2, turnToward, TAU_QUARTER } from '../core/vec';
 import { damageMultiplier } from '../data/armor';
 import type { DamageType } from '../data/towers';
@@ -42,6 +43,14 @@ export interface TowerContext {
 /** How much of its usual effectiveness a hungry tower manages. */
 const STARVING_EFFECTIVENESS = 0.6;
 
+/**
+ * How far from the centre of a swinging flail head its blow still lands. The
+ * ball is not a point — this is the spiked ball plus the arc it carries — but
+ * it is small, and that is the whole reason a sweep tower threatens a *band*
+ * of ground rather than a filled circle.
+ */
+const FLAIL_HEAD_REACH = 13;
+
 export class Tower implements DamageSource {
   readonly def: TowerDef;
   readonly x: number;
@@ -66,8 +75,15 @@ export class Tower implements DamageSource {
 
   angle = -Math.PI / 2;
   private cooldown = 0;
-  /** Sweep towers: seconds until the weapon comes round again. */
-  private sweepCooldown = 0;
+  /**
+   * Sweep towers: where the head is on its circle right now, in radians. Public
+   * because the renderer draws the ball at exactly this angle — the ball you
+   * can see is the ball that hits, and that only holds if both read the same
+   * number.
+   */
+  flailAngle = 0;
+  /** Everyone the head has already caught on this revolution. */
+  private readonly struckThisTurn = new Set<Creep>();
   /** Firing animation: set to 1 on each shot, decays back to 0. */
   flash = 0;
   target: Creep | null = null;
@@ -365,32 +381,46 @@ export class Tower implements DamageSource {
   }
 
   /**
-   * A weapon turned in a full circle on a timer. There is **no target**: the
-   * swing happens whether or not anything is there, and everything standing
-   * inside the circle when it comes past takes the blow.
+   * A weapon on a chain, going round and round. There is **no target**.
    *
-   * Unlike a fighter's whirlwind this does not wait for something to be in
-   * reach before starting the cooldown. A man conserves his strength; a post
-   * whose entire job is to keep the ball moving does not, and making the timer
-   * free-running is what keeps the animation honest — the ball you can see
-   * going round is the ball that hits.
+   * The head travels a circle of radius `whirlwindRadius`, one revolution every
+   * `whirlwindInterval` seconds, and hurts whatever the ball itself passes
+   * through — a creep is struck when the head reaches *it*, not when the timer
+   * fires. Each one takes the blow once per revolution: `struckThisTurn` holds
+   * everyone already caught, and empties as the head comes back round.
+   *
+   * This replaced a version that damaged everything inside the circle at once
+   * every interval, which was far too strong for the price. It was not the
+   * numbers that were wrong so much as the shape: a single 85-gold post landed
+   * its full damage on a dozen enemies simultaneously. Now the ball has to
+   * physically reach you, so what it threatens is a *band* of ground at arm's
+   * length rather than a filled disc — and the enemies inside that band are hit
+   * one after another as it comes round, not all in the same instant.
    */
   private updateSweep(dt: number, ctx: TowerContext): void {
-    this.sweepCooldown -= dt;
-    if (this.sweepCooldown > 0) return;
+    const period = this.stats.whirlwindInterval;
+    const orbit = this.stats.whirlwindRadius;
+    if (period <= 0 || orbit <= 0 || this.stats.whirlwindDamage <= 0) return;
 
-    const interval = this.stats.whirlwindInterval;
-    if (interval <= 0 || this.stats.whirlwindDamage <= 0) return;
     // Hungry crews swing slower, exactly as hungry crews shoot slower.
-    this.sweepCooldown = interval / this.effectiveness;
-    this.flash = 1;
+    this.flailAngle += ((TAU / period) * dt) / Math.max(0.01, 1 / this.effectiveness);
+    if (this.flailAngle >= TAU) {
+      this.flailAngle -= TAU;
+      // Round again: everyone is a fresh target.
+      this.struckThisTurn.clear();
+    }
 
-    const reach = this.stats.whirlwindRadius;
-    const reachSq = reach * reach;
+    const hx = this.x + Math.cos(this.flailAngle) * orbit;
+    const hy = this.y + Math.sin(this.flailAngle) * orbit;
+
     for (const creep of ctx.creeps) {
-      if (!creep.alive) continue;
-      if (dist2(this.x, this.y, creep.x, creep.y) > reachSq) continue;
+      if (!creep.alive || this.struckThisTurn.has(creep)) continue;
+      const reach = FLAIL_HEAD_REACH + creep.def.radius;
+      if (dist2(hx, hy, creep.x, creep.y) > reach * reach) continue;
+
       creep.takeDamage(this.stats.whirlwindDamage, this.stats.damageType, this);
+      this.struckThisTurn.add(creep);
+      this.flash = 1;
     }
   }
 

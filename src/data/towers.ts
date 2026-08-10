@@ -878,30 +878,44 @@ export const TOWERS = {
     name: 'Flail Guard',
     housing: 1,
     food: 1,
-    blurb: 'Swings a morning star in a full circle. Hits everything around him at once — but only just around him.',
+    blurb: 'Swings a morning star round and round. Whatever the ball reaches is struck as it passes.',
     cost: 85,
     radius: 13,
     /**
-     * A `sweep` tower, and the only one. He picks nobody: the ball goes round
-     * on its own rhythm and whatever is inside the circle when it comes past
-     * takes the blow.
+     * A `sweep` tower, and the only one. He picks nobody: the head goes round
+     * on a chain and strikes whatever it physically reaches, as it reaches it.
      *
-     * This started life as an ordinary shooting tower that threw a flail head
-     * at a single enemy, which was wrong twice over — it made the whirling
-     * animation a lie, and it wasted the one idea that makes a very short reach
-     * worth having. A single-target weapon with a 95 reach is simply a bad
-     * shooting tower. A weapon that hits *everything* within 95 is a reason to
-     * go looking for an inside corner where the road doubles back and the whole
-     * press walks through the same circle.
+     * Two earlier versions were wrong in opposite directions. First it was an
+     * ordinary shooting tower that threw a flail head at one enemy, which made
+     * the whirling animation a lie. Then it damaged *everything inside the
+     * circle* every interval, which was far too strong — a single 85-gold post
+     * landing its full damage on a dozen enemies at once, well over 200
+     * effective damage a second.
+     *
+     * What it threatens now is a **band** of ground at arm's length, not a
+     * filled disc: only what the ball passes through is hit, and each enemy
+     * takes one blow per revolution rather than one per timer tick. That keeps
+     * the reason for the short reach — find the inside corner where the road
+     * doubles back through the ring — without the absurd throughput.
      */
     attack: 'sweep',
     visual: 'flail-guard',
     baseColor: '#6a6470',
-    // For a sweep tower the range and the circle are the same thing, so the
-    // selection ring shows exactly what will be hit.
-    range: 95,
-    whirlwindRadius: 95,
-    whirlwindDamage: 34,
+    /**
+     * `whirlwindRadius` is the circle the head travels; `range` is that plus
+     * the ball's own reach (`FLAIL_HEAD_REACH` in `Tower.ts`), so the selection
+     * ring shows the furthest anything can be struck.
+     *
+     * The band threatened runs from roughly 45 to 71 out — narrow, and narrow
+     * on purpose. A wider ball caught three or four enemies at all times beside
+     * a busy road and did three times a rock thrower's work for fifteen more
+     * gold. What it should be paid for is catching *two* where a single-target
+     * tower catches one.
+     */
+    range: 71,
+    whirlwindRadius: 58,
+    whirlwindDamage: 12,
+    /** Seconds for one full revolution — so, seconds between blows on the same enemy. */
     whirlwindInterval: 1.5,
     turnSpeed: 8,
     damageType: 'blunt',
@@ -911,30 +925,31 @@ export const TOWERS = {
       {
         id: 'heavier-head',
         name: 'Heavier Head',
-        description: 'A bigger ball on a shorter haft. Every swing hits for 34 instead of 24.',
+        description: 'A bigger ball on a shorter haft. Each blow lands for 21 instead of 12.',
         cost: 130,
-        stats: { whirlwindDamage: 52 },
+        stats: { whirlwindDamage: 21 },
       },
       {
         id: 'spiked-head',
         name: 'Spiked Head',
-        description: 'Flanges welded round the ball, so every blow bites. Swings hit for 52 instead of 34.',
+        description: 'Flanges welded round the ball, so every blow bites. Blows land for 31 instead of 21.',
         cost: 180,
         requires: ['heavier-head'],
-        stats: { whirlwindDamage: 74 },
+        stats: { whirlwindDamage: 31 },
       },
       {
         id: 'longer-chain',
         name: 'Longer Chain',
         description:
-          'Another two feet of chain. The circle widens from 95 to 135 — enough to matter on a gentler corner.',
+          'Another two feet of chain. The head sweeps a wider circle — 62 out instead of 42 — so it covers more of the road, though the band it beats is no thicker.',
         cost: 110,
-        stats: { range: 135, whirlwindRadius: 135 },
+        stats: { range: 97, whirlwindRadius: 84 },
       },
       {
         id: 'second-flail',
         name: 'Second Flail',
-        description: 'One in each hand, swung alternately. A blow every second instead of every 1.5.',
+        description:
+          'One in each hand, swung alternately, so the head comes round half again as often — a blow every second instead of every 1.5.',
         cost: 150,
         stats: { whirlwindInterval: 1 },
       },
