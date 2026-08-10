@@ -1344,7 +1344,11 @@ export function drawFlailGuard(
   ctx.lineTo(4.4, 0.4);
   ctx.stroke();
 
-  ctx.restore();
+  // Exactly one restore, matching the single save above. A second one here
+  // popped a state off the *caller's* stack, which unwound the whole-canvas
+  // transform set up in `Renderer.render` — so from the first Flail Guard
+  // onwards every tower and creep in that frame was drawn at the wrong scale
+  // and offset, and most of them off-screen entirely.
   ctx.restore();
 }
 

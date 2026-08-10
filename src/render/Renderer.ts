@@ -207,6 +207,38 @@ export class Renderer {
     this.drawProjectiles();
     this.drawCrows();
     this.drawGhost();
+
+    if (import.meta.env.DEV) this.assertTransformIntact(scale);
+  }
+
+  /**
+   * Check the canvas transform survived the frame, and say so loudly if not.
+   *
+   * Every figure here draws inside a matched `save`/`restore` pair. Get that
+   * wrong by one — a stray `restore()` — and the extra pop unwinds the
+   * whole-canvas transform set up at the top of this method, so *everything
+   * drawn after the offending figure* lands at the wrong scale or rotation.
+   * That has happened once already, and the symptom is baffling: towers
+   * vanish, enemies appear to walk off in a straight line at the wrong angle,
+   * and it only shows up when one particular building is on the board.
+   *
+   * A leak is a programming error rather than a state to recover from, so this
+   * complains rather than repairing anything — and only once, or a broken
+   * frame would fill the console sixty times a second.
+   */
+  private transformWarned = false;
+  private assertTransformIntact(scale: number): void {
+    if (this.transformWarned) return;
+    const m = this.ctx.getTransform();
+    const off = Math.abs(m.a - scale) + Math.abs(m.d - scale) + Math.abs(m.b) + Math.abs(m.c);
+    if (off < 1e-6) return;
+
+    this.transformWarned = true;
+    console.error(
+      'Renderer: the canvas transform did not survive the frame — some draw function has ' +
+        'an unbalanced ctx.save()/ctx.restore(). Expected scale ' +
+        `${scale}, got a=${m.a} b=${m.b} c=${m.c} d=${m.d}.`,
+    );
   }
 
   /** Crows drift over the top of everything; they are in the air. */
