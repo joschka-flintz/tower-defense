@@ -20,6 +20,11 @@ export interface SwordsmanOwner {
   speed: number;
   /** Health fraction below which he breaks off and looks for a hospital. */
   retreatAt: number;
+  /**
+   * The gentler threshold: health below this is worth walking off during a
+   * lull, but not worth abandoning a fight for.
+   */
+  restAt: number;
   /** Whirlwind: damage to everything around him, 0 when not trained for it. */
   whirlwindDamage: number;
   whirlwindRadius: number;
@@ -58,6 +63,18 @@ const REACH = 8;
 const FIT_AGAIN = 0.95;
 
 /**
+ * How long his post must have nothing in reach before he counts it a lull and
+ * walks off to the surgeons.
+ *
+ * Without this he dithers. A wave arrives as a trickle, not a block, so "no
+ * target right now" flickers on and off every second or so; measured, he
+ * alternated between `fighting` and `retreating` twice a second and never got
+ * more than a few paces from his post. Requiring the quiet to hold means he
+ * only leaves in a gap actually long enough to be worth something.
+ */
+const LULL = 2.5;
+
+/**
  * A fighter who steps onto the road and holds an enemy there, exactly as a
  * dog does — but he has real health and the enemy hits back.
  *
@@ -88,6 +105,22 @@ export class Swordsman implements MeleeDefender {
   readonly homeY: number;
   private hospital: HospitalRef | null = null;
 
+  /**
+   * True when this trip to the hospital is a lull-time visit rather than a
+   * retreat. He gives it up the moment anything comes into his post's reach.
+   */
+  private resting = false;
+
+  /**
+   * Whether he has been in the fight at all this wave. Nobody walks off to the
+   * surgeons before a blow has been struck — a post that starts a wave under
+   * strength should stand in the line, not queue at the ward.
+   */
+  private hasFought = false;
+
+  /** Seconds his post has had nothing in reach. See `LULL`. */
+  private quiet = 0;
+
   /** Seconds until the next whirlwind. */
   private spinCooldown = 0;
   /** Runs 1 to 0 right after a spin, purely for the animation. */
@@ -113,6 +146,7 @@ export class Swordsman implements MeleeDefender {
   recoverBetweenWaves(fraction: number, newMaxHp: number): void {
     this.maxHp = newMaxHp;
     this.hp = Math.min(this.maxHp, this.hp + this.maxHp * fraction);
+    this.hasFought = false;
   }
 
   takeHit(damage: number, type: DamageType): void {
@@ -162,6 +196,19 @@ export class Swordsman implements MeleeDefender {
       this.spin = Math.max(0, this.spin - dt / 0.35);
     }
 
+    // A lull-time visit to the ward is given up the instant the post has
+    // something to do again. A retreat is not: he is too hurt to be useful.
+    if (this.resting && (this.state === 'healing' || this.state === 'retreating')) {
+      if (this.healthFraction < owner.retreatAt) {
+        this.resting = false;
+      } else if (this.acquire(creeps, owner)) {
+        this.resting = false;
+        this.quiet = 0;
+        this.hospital = null;
+        this.state = 'returning';
+      }
+    }
+
     // Being treated: stay put until fit, then walk back to the post.
     if (this.state === 'healing') {
       const ward = this.hospital;
@@ -169,6 +216,7 @@ export class Swordsman implements MeleeDefender {
         this.hp = Math.min(this.maxHp, this.hp + ward.healRate * dt);
         if (this.healthFraction >= FIT_AGAIN) {
           this.hospital = null;
+          this.resting = false;
           this.state = 'returning';
         }
         return;
@@ -195,6 +243,7 @@ export class Swordsman implements MeleeDefender {
       if (ward) {
         this.hospital = ward;
         this.target = null;
+        this.resting = false;
         this.state = 'retreating';
         return;
       }
@@ -214,6 +263,8 @@ export class Swordsman implements MeleeDefender {
       this.target = this.acquire(creeps, owner);
     }
 
+    this.quiet = this.target ? 0 : this.quiet + dt;
+
     if (this.target) {
       // Never claim something unstoppable — other defenders should stay free
       // to deal with enemies they can actually pin down.
@@ -223,12 +274,26 @@ export class Swordsman implements MeleeDefender {
 
       if (gap <= reach) {
         this.state = 'fighting';
+        this.hasFought = true;
         this.duel(dt, owner);
       } else {
         this.state = 'advancing';
         this.moveTowards(this.target.x, this.target.y, owner.speed, dt);
       }
       return;
+    }
+
+    // Nothing to fight. If he has been in it and is carrying wounds, the lull
+    // is worth spending on the surgeons rather than standing at his post — he
+    // rides straight back the moment anything comes into the post's reach.
+    if (this.hasFought && this.quiet >= LULL && this.healthFraction < owner.restAt) {
+      const ward = this.nearestHospital(hospitals);
+      if (ward) {
+        this.hospital = ward;
+        this.resting = true;
+        this.state = 'retreating';
+        return;
+      }
     }
 
     if (dist2(this.x, this.y, this.homeX, this.homeY) > 4) {
@@ -240,15 +305,27 @@ export class Swordsman implements MeleeDefender {
   }
 
   /**
-   * The nearest hospital that will actually have him — one whose reach covers
-   * where he is standing. Out of everyone's reach he simply has nowhere to go.
+   * The nearest hospital that will actually have him.
+   *
+   * A hospital's reach covers **posts**, not wandering men: it takes him if
+   * either he or the post he was raised from stands inside it. Measuring only
+   * from where he happens to be standing looks equivalent and is not — a
+   * mounted knight rides 230 out from his post, further than a hospital's own
+   * 210 reach, so he was hurt out of range of the ward that covers his own
+   * stable and fought on at a sliver of health while every other post, none of
+   * which strays more than 175, fell back and was patched up. The lancer at
+   * 215 had the same problem.
+   *
+   * Out of reach of every hospital by both measures he has nowhere to go and
+   * holds where he stands, which is still the point of placing them well.
    */
   private nearestHospital(hospitals: HospitalRef[]): HospitalRef | null {
     let best: HospitalRef | null = null;
     let bestDist = Infinity;
     for (const ward of hospitals) {
+      const reachSq = ward.range * ward.range;
       const d = dist2(this.x, this.y, ward.x, ward.y);
-      if (d > ward.range * ward.range) continue;
+      if (d > reachSq && dist2(this.homeX, this.homeY, ward.x, ward.y) > reachSq) continue;
       if (d < bestDist) {
         bestDist = d;
         best = ward;

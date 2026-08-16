@@ -49,6 +49,11 @@ export class Creep {
    * `Lane.joinRemaining`.
    */
   readonly joinRemaining: number;
+  /**
+   * Which independent route it is walking. Only gates on the same route can
+   * stop it — see `Lane.routeId`.
+   */
+  routeId = 'main';
 
   /** Distance travelled along the route. Position is derived from this. */
   distance = 0;
@@ -104,6 +109,19 @@ export class Creep {
    */
   readonly lane: number;
 
+  /**
+   * How much room this creep's route has either side of its centre line, as a
+   * function of how far along it is — or null where nothing constrains it.
+   *
+   * This is what keeps a front on the sand. Without it a creep picks a wander
+   * to one side once and keeps it, which is fine on a road and wrong on open
+   * ground: the moment its corridor narrows between two hills, half the front
+   * is walking over them. The wander is clamped to the room actually available
+   * where it is standing, so a front broadens across open sand and squeezes
+   * together at a gap, which is also what a real one looks like.
+   */
+  corridor: ((distance: number) => number) | null = null;
+
   constructor(
     def: CreepDef,
     path: Path,
@@ -126,6 +144,24 @@ export class Creep {
     this.x = start.x - Math.sin(start.angle) * this.lane;
     this.y = start.y + Math.cos(start.angle) * this.lane;
     this.angle = start.angle;
+  }
+
+  /**
+   * How far off the centre line this creep is actually walking right now:
+   * whatever wander it was given, or as much of it as the ground allows.
+   */
+  private get offset(): number {
+    if (!this.corridor) return this.lane;
+    const room = Math.max(0, this.corridor(this.distance) - this.def.radius - 2);
+    return Math.max(-room, Math.min(room, this.lane));
+  }
+
+  /** Put the body on the route at its current distance, offset and all. */
+  private place(p: { x: number; y: number; angle: number }): void {
+    const off = this.offset;
+    this.x = p.x - Math.sin(p.angle) * off;
+    this.y = p.y + Math.cos(p.angle) * off;
+    this.angle = p.angle;
   }
 
   /**
@@ -188,10 +224,7 @@ export class Creep {
       this.leaked = true;
     }
 
-    const p = this.path.positionAt(this.distance);
-    this.x = p.x - Math.sin(p.angle) * this.lane;
-    this.y = p.y + Math.cos(p.angle) * this.lane;
-    this.angle = p.angle;
+    this.place(this.path.positionAt(this.distance));
 
     // While actually trading blows, face whoever is holding it rather than
     // blindly forward — an attacker to the side or behind turns it to meet.
@@ -208,10 +241,7 @@ export class Creep {
    */
   warpTo(distance: number): void {
     this.distance = Math.max(0, distance);
-    const p = this.path.positionAt(this.distance);
-    this.x = p.x - Math.sin(p.angle) * this.lane;
-    this.y = p.y + Math.cos(p.angle) * this.lane;
-    this.angle = p.angle;
+    this.place(this.path.positionAt(this.distance));
   }
 
   /**

@@ -114,11 +114,11 @@ npm run balance
 `tools/balance.ts` holds a fake player and a shopping list per nation; `tools/run-balance.mjs`
 bundles it with the esbuild already inside Vite and runs it under Node. Flags: a nation name to
 run only that one, `--all` to include nations marked unplayable, `--gold=N` for a diagnostic run
-at a purse the design does not give you, `--debug` to print why a purchase failed. It exits
-non-zero if a nation marked `playable` loses.
+at a purse the design does not give you, `--debug` to print why a purchase failed, `--map=<id>` to
+fight over different ground. It exits non-zero if a nation marked `playable` loses.
 
-Always test at **`DESIGN_STARTING_GOLD`** (currently 260, in `src/game/Game.ts`). The HUD's
-"Start gold" box is a testing convenience for the user only — never balance against it.
+Always test at **`DESIGN_STARTING_GOLD`** (currently 260, in `src/game/Game.ts`). The start screen's
+gold box and the dev bar's are conveniences for the user only — never balance against them.
 
 Build spots are generated on a grid, filtered to those 42–190 units from the path, and **sorted by
 distance to the path ascending**. Filling the map corner-first produces meaningless results — this
@@ -137,6 +137,144 @@ work turned out to be the fake player, not the game:
   is income, not capability.
 
 ---
+
+## The start screen, and what a game is made of
+
+A game is now four choices — **mode, nation, map, purse** — made on a start screen before anything
+runs, and each of the four is a data file: `modes.ts`, `nations.ts`, `maps.ts`, and a number.
+`src/ui/start.ts` renders itself entirely from those, including the "not balanced" flags. If adding
+a mode or a map ever requires editing `start.ts`, the data shape is wrong, not the screen.
+
+Two structural decisions in there worth keeping:
+
+- **One `Game`, one `Renderer`, one HUD for the life of the page.** The start screen calls
+  `Game.configure`, which swaps the map and resets; it does not build a new game. Building a fresh
+  set per game would re-bind every HUD listener (a second Start Wave click per game started) and
+  repeat several seconds of sprite pre-rendering. `Renderer.render` notices when the ground under it
+  is not the ground it painted and calls `retile`.
+- **The simulation stands still while the screen is up** (`main.ts` skips `update`). The board
+  behind it is the last game's, and it should not play on unattended.
+
+`Game.map` is no longer `readonly`. Everything on the board is in map coordinates, so a map change
+can only ever be a new game — `configure` is the only thing that swaps it, and it resets.
+
+## Open-ground maps: routes, hills and chokes
+
+`Sand of the Three Gates` is the first map that is not a road, and it added three things to the map
+model. All three are *properties a map declares*, not modes the engine switches into — a map that
+declares none of them behaves exactly as before.
+
+- **`routes`** — further independent ways in, each ending at its own gate. `GameMap.routes` is the
+  main road plus these; trails still belong to the road they join. Every lane now carries a
+  `routeId`, and so does every creep and every gatehouse, because **"how far is left to walk" is
+  only a shared coordinate between lanes that end in the same place**. Trails do (they are spliced
+  onto the main road's tail, which is what lets a gate on that tail stop their creeps); two routes
+  making for two different gates do not. `besiegeGates` compares `routeId` first for exactly that
+  reason.
+- **`hills`** — the only buildable ground. `checkPlacement` picks *either* the hill rule or the
+  road-clearance rule, never both: layering them would make a hill that happened to lie near a
+  route silently unbuildable, which is the kind of rule a player cannot see.
+
+  A hill is **either a circle or a traced outline**, and the outlines are the point. Hand-drawn
+  ground is not made of circles: the shapes on the sketch this map came from are fingers hanging off
+  the map edges, masses with bays bitten out of them, and a ring around a hollow, none of which a
+  chain of circles can say. Two things about drawing them were got wrong first and are worth not
+  repeating — the outline is run through a **Catmull-Rom spline**, which passes *through* every
+  traced point (cutting corners between them instead rounded every bay and finger away into the same
+  fat oval), and the slope is a **thick stroke of the outline** rather than a second larger copy of
+  it (growing a shape by pushing its points out from its middle only works on a round one; on a
+  lobed patch it pulls the lobes apart and closes the bays).
+- **The enemy keeps to the sand.** Hills are solid ground it walks *around*, which is why a route
+  on such a map is not the line the map draws: `src/game/terrain.ts` turns the ground into a
+  walkable grid and finds the way through the gaps, and only a route's **first and last** points —
+  where a front walks on, and which gate it makes for — are read from the map at all. Redraw a patch
+  and the fronts re-route themselves; there is no second copy of the map's shape to keep in step.
+
+  Three things in there were each wrong once and are worth not repeating. A **ladder of clearances**
+  (30, 20, 13, then anything) makes a front prefer the open corridor and squeeze only when there is
+  no alternative — without the wide rungs a single narrow slot becomes the way in for the whole army,
+  and without the last rung the search fails on a tight map and *silently* falls back to the straight
+  line, walking everyone over the hills. The **run-in at either end is excused the minimum**, because
+  the sand outside a gate is hard against stone and can never be as open as a corridor — holding it
+  to the full clearance failed every rung. And a cell counts as blocked if **any** of it is hill,
+  not just its centre, with a cell's width taken off every clearance reading, or bodies placed
+  against those readings sit visibly in the grass.
+
+  A creep's wander to one side is clamped to `Lane.corridor` — the room actually available where it
+  is standing — so a front broadens over open sand and files through a gap. Measured on the current
+  shapes: centre lines 0% over hills, bodies grazing one about 4% of samples, all of it at gaps
+  narrower than a creep.
+
+  **Press `P` in game to draw the fronts and their corridors.** On a map whose ground is drawn by
+  hand that is the only way to see what moving a patch did, and a pinched or shared corridor is
+  obvious at a glance.
+
+- **`chokes`** — gaps where a gatehouse may be walled in, since there is no road to straddle. On a
+  pathfound map they are **found**, not named: the tightest points of each front, spaced apart, on
+  the board and clear of both ends. Hand-placed ones rotted — move a hill and a gap that no longer
+  existed was still offered as somewhere to build a gate.
+  `GameMap.chokeStance` is the single answer to where a wall there stands and which way it faces,
+  so the mark on the board, the ghost under the cursor and the gate that ends up there cannot
+  disagree. The marks are drawn **only while a gatehouse is being placed** — painted onto the
+  terrain they were just unexplained circles on ground the player was not using.
+
+### Editing the sand map
+
+The shapes in `DUNE_THRONE.hills` are meant to be edited by hand; everything else about the map
+follows from them. What to watch, with `P` held on:
+
+- **Leave corridors.** Patches drawn close enough to seal the middle of the board do not make the
+  map harder, they make two fronts detour through the same gap somewhere else. That is the state
+  the current shapes are in: the middle front takes a long way round to the south.
+- A patch **against a map edge beside an entry** pinches the front as it walks on. The router now
+  tries a spread of points along that edge and takes the roomiest, but it cannot invent a gap.
+- Gaps narrower than a creep are walked in single file, with bodies overlapping the grass a little.
+  That is the honest result of the ground; widen the gap if it looks wrong.
+
+A wave is **split evenly between the open fronts**, so the wave table keeps meaning what it says.
+Fronts open on set waves (`RouteDef.fromWave`): three at once from wave one is not three times the
+enemy, but it is three places to be at once with a wave-one purse, and it turns the opening into a
+guess about which gate to defend.
+
+**The castle is a list of blocks**, each running off the east map edge, each with its own gates.
+Where two blocks meet, the shared face is not drawn — that is what makes an L-shaped city read as
+one continuous wall that steps rather than two compounds with a curtain between them. The town
+(market, plots, and the hall unless `hall: false`) goes in whichever block sets `town: true`; the
+rest are wall and a yard.
+
+Two things about blocks that were wrong once:
+
+- **A neighbour to the *west* covers a face completely.** Every block runs east to the map edge, so
+  the exposed part of a north or south face ends at the leftmost neighbour touching that edge —
+  and when that neighbour starts further west than the block does, none of the face is exposed at
+  all. Skipping those neighbours drew a wall straight across the inside of the city at the step.
+- **Gates need room for their towers.** Each carries a drum 46 from its middle with a radius of 20,
+  and a block's corners carry one with a radius of 23, so a gate wants ~90 from the end of its wall
+  and ~92 from the next gate. Closer than that and the towers visibly overlap at different sizes.
+
+A block may have **no gate at all** (`gates: []`). The Sand map's walled quarter is sealed and all
+three of its gates are on the strip: a gate in the quarter would be a fourth way in that no front
+is making for.
+
+**The hall is placed against its block, not at fixed coordinates**, so a walled quarter somewhere
+else still has its hall inside it. That was the last hard-coded thing about the city; the plots and
+the market are still per-map data and have to be authored clear of it.
+
+## Selling
+
+Half of everything spent on a building, upgrades included, rounded down (`SELL_REFUND` in
+`Game.ts`). Three things about it that were decided rather than fallen into:
+
+- **The refund is against gold actually paid**, recorded on `Tower.goldSpent` as it is spent, not
+  recomputed from the price list. The Marches pay 70% for a hospital; recomputing would refund them
+  half of a price they never paid, and any future price change would silently rewrite the value of
+  everything already standing.
+- **A gatehouse is sold with its turrets**, and the refund covers them. The alternative is a turret
+  standing on nothing, which is not a thing the board can draw.
+- **The one refusal is housing.** Pulling down a house that other buildings are counted under would
+  leave `housingFree` negative — a state the player cannot see and cannot easily undo, since every
+  build check reads it. Food deliberately has no such guard: going hungry is a survivable penalty
+  and always has been, so selling your last farm stays a mistake you are allowed to make.
 
 ## Design decisions worth not re-litigating
 
@@ -225,18 +363,51 @@ never builds a hospital to cover its crossbows, and nothing in the plan reacts t
 **Expect the numbers to be worse than a human's, and do not tune against them until the plans have
 been rewritten for the new roster.**
 
+## Who can be healed, and who cannot
+
+Audited in full after the mounted knight turned out to be fighting on at a sliver of health:
+
+| Thing | Mended by a hospital? |
+| --- | --- |
+| Every melee post (all of them are `Swordsman`) | **Yes.** Retreats below its own `retreatAt`, and now also spends a lull at the ward below `restAt` (70%). |
+| Every emplacement that shoots, and the Flail Guard | **Yes** — `Tower.updateRepairs`, at the cost of not shooting while worked on. Includes rock throwers and cauldrons installed in a **gatehouse turret**: gate slots get the same context as free-standing towers. |
+| Siege engines (catapult) | Yes, plus their own crew below `retreatAt`. |
+| The gatehouse and the city gate themselves | No — repaired with **gold**, by hand, from their panel. Deliberate. |
+| **Hounds** | **No, and they never have been.** `Dog` has no retreat, no threshold and no hospital code at all. Only the houndmaster fields them and only the Wardens field him, so it is dead content today — but it is a real gap if that nation is ever designed. |
+
+A hospital's reach covers **posts**, not wandering men: it admits a fighter if either he or his home
+post stands inside the circle. Measuring only from where the man happens to be looks equivalent and
+is not — the mounted knight rides 230 out from his post and the hospital only reaches 210, so he was
+routinely wounded outside the reach of the very ward that covered his stable, found nothing, and
+fought on until he died. The lancer (215) had the same hole. Every other post stays within 175.
+
 ## Known problems
 
 1. **The Wardens are a placeholder.** `nations.ts` marks them `playable: false` and they lose on
    wave 4–5. Their roster is only "everything the Kingdom gave up" — archers, houndmasters — with
    no design behind it, and the shopping list in `balance.ts` is a stub. That is the next job.
-2. **There is no pre-game nation chooser.** The dropdown in the dev bar is the only way to switch,
-   and it restarts the game. Deliberate for now — the Kingdom is the one that is finished.
-3. The **royal hall** in the city is clipped by the right map edge. Intentional-ish (it reads as a
+2. **Neither new map has been balanced.** `--map=hollow-way` loses on waves 9–10 where the Meadow
+   loses on 11. `--map=dune-throne` loses on **7–9**, and that one has a specific diagnosis worth
+   keeping: at `--gold=6000` it reached wave 17 with the first hill layout, so the roster *can*
+   hold three fronts — **it cannot afford to**. Three fronts want something close to three
+   defences, and the wave rewards are tuned for one. If it needs help, more income on that map (or
+   later-opening fronts) is the lever, not stronger towers.
+
+   Read both sceptically. The fake player places by distance-to-route and clusters within a front;
+   it has no idea that the central massif covers two fronts at once, which is the whole point of
+   the ground. Denser hills actually made its big-purse runs *worse*, because more legal ground let
+   it spread further — the clustering finding from the nations session, showing up again.
+3. **There is one play mode.** `modes.ts` exists so the second one is a data entry; nothing in
+   `Game` switches on a mode id, and only `lives` and `waves` are wired up. A mode that wants to
+   change the wave table or the economy needs a field there first.
+4. **Every route must still arrive at its gate from due west**, and the city still runs off the
+   east edge. The hall now follows its block, but the gate passages, the streets and the wall faces
+   are all drawn west-facing. A city anywhere else on the board is a drawing job.
+5. The **royal hall** in the city is clipped by the right map edge. Intentional-ish (it reads as a
    city continuing off-map) but could be composed better.
-4. **Creeps are still coloured circles** apart from the Feral Hound. They look increasingly out of
+6. **Creeps are still coloured circles** apart from the Feral Hound. They look increasingly out of
    place next to the detailed towers. This is the obvious next art job.
-5. There are **no sounds, no save/load, and only one map**.
+7. There are **no sounds and no save/load**.
 
 ### Fixed since last time
 

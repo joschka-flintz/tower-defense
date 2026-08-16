@@ -3,14 +3,29 @@ import { Game } from './game/Game';
 import { Renderer } from './render/Renderer';
 import { createHud } from './ui/hud';
 import { makePanelsMovable } from './ui/panels';
+import { createStartScreen } from './ui/start';
 
 const found = document.querySelector<HTMLCanvasElement>('#game');
 if (!found) throw new Error('Missing <canvas id="game"> in index.html');
 const canvas: HTMLCanvasElement = found;
 
+/**
+ * One game, one renderer and one HUD for the life of the page.
+ *
+ * The start screen configures this game rather than building a new one. That
+ * matters: the HUD binds itself to DOM elements once, and the renderer bakes
+ * its sprites once, so making a fresh set per game would double up every
+ * listener and repeat several seconds of sprite work. `Game.configure` swaps
+ * the map and resets the board; `Renderer.render` notices the new ground and
+ * repaints its terrain.
+ */
 const game = new Game();
 const renderer = new Renderer(canvas, game);
-const hud = createHud(game);
+const startScreen = createStartScreen((config) => {
+  game.configure(config);
+  startScreen.hide();
+});
+const hud = createHud(game, { onMenu: () => startScreen.show() });
 makePanelsMovable();
 
 /** Match the canvas pixel buffer to its on-screen size so nothing looks blurry. */
@@ -69,10 +84,19 @@ window.addEventListener('keydown', (event) => {
   if (event.key === 'r' || event.key === 'R') {
     game.gateRotation += (event.shiftKey ? -1 : 1) * (Math.PI / 12);
   }
+  // Show where the enemy actually walks, and how much room it has. On a map
+  // whose ground is drawn by hand this is how you see what moving a hill did.
+  if (event.key === 'p' || event.key === 'P') {
+    renderer.showRoutes = !renderer.showRoutes;
+  }
 });
 
 startLoop(
-  (dt) => game.update(dt),
+  // The world stands still behind the start screen — the board on show there
+  // is the last game's, and it should not quietly play on without a player.
+  (dt) => {
+    if (!startScreen.visible) game.update(dt);
+  },
   () => {
     renderer.render();
     hud.update();
@@ -81,5 +105,5 @@ startLoop(
 
 // Dev-only handle so the game can be inspected or driven from the browser console.
 if (import.meta.env.DEV) {
-  Object.assign(window, { td: { game, renderer, hud } });
+  Object.assign(window, { td: { game, renderer, hud, startScreen } });
 }

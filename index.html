@@ -28,12 +28,14 @@
           <button id="btn-wave" class="btn">Start Wave</button>
         </div>
 
+        <!--
+          Nation and starting gold are chosen on the start screen now, so the
+          dev bar keeps only the two things that are about the game in front of
+          you: start it over with the same setup, or go back and change it.
+        -->
         <div id="devbar" class="panel">
-          <label class="label" for="dev-gold">Start gold</label>
-          <input id="dev-gold" type="number" min="0" step="25" value="175" />
-          <label class="label" for="dev-nation">Nation</label>
-          <select id="dev-nation"></select>
           <button id="btn-newgame" class="btn">New game</button>
+          <button id="btn-menu" class="btn ghost">Menu</button>
         </div>
 
         <div id="shop" class="panel draggable scrolls" data-resize>
@@ -44,6 +46,7 @@
           <div class="panel-body">
             <div id="shop-perks"></div>
             <div id="shop-items"></div>
+            <p class="hint" id="shop-ground"></p>
             <p class="hint">Click a tower, then click the map.<br />Right-click or Esc to cancel.<br />Drag the corner to resize.</p>
           </div>
         </div>
@@ -64,8 +67,67 @@
           <div class="overlay-box">
             <h1 id="overlay-title">Game Over</h1>
             <p id="overlay-text"></p>
-            <button id="btn-restart" class="btn">Play Again</button>
+            <div class="overlay-actions">
+              <button id="btn-restart" class="btn">Play Again</button>
+              <button id="btn-overlay-menu" class="btn ghost">Back to Menu</button>
+            </div>
           </div>
+        </div>
+      </div>
+
+      <!--
+        The start screen. It sits over the whole app rather than inside the
+        stage, because until it is dismissed there is no game running behind it.
+        Every list in it is filled from `src/data/` by `src/ui/start.ts` — there
+        are no nation, map or mode names written into this markup.
+      -->
+      <div id="start" class="start">
+        <div class="start-sheet">
+          <header class="start-head">
+            <h1>Realm Defense</h1>
+            <p class="start-tagline">
+              An enemy is marching on your city. Build along the road, and do not let them reach the
+              gate.
+            </p>
+          </header>
+
+          <div class="start-cols">
+            <section class="start-rules">
+              <h2>How it is played</h2>
+              <div id="start-rules-body"></div>
+            </section>
+
+            <div class="start-choices">
+              <section class="start-field">
+                <h2>Play mode</h2>
+                <div id="start-modes" class="start-cards"></div>
+              </section>
+
+              <section class="start-field">
+                <h2>Nation</h2>
+                <div id="start-nations" class="start-cards"></div>
+              </section>
+
+              <section class="start-field">
+                <h2>Map</h2>
+                <div id="start-maps" class="start-cards"></div>
+              </section>
+
+              <section class="start-field">
+                <h2>Starting gold</h2>
+                <div class="start-gold">
+                  <input id="start-gold" type="number" min="0" step="10" value="260" />
+                  <div id="start-gold-presets" class="start-presets"></div>
+                </div>
+                <p id="start-gold-note" class="start-note"></p>
+              </section>
+            </div>
+          </div>
+
+          <footer class="start-foot">
+            <p id="start-summary" class="start-summary"></p>
+            <button id="btn-begin" class="btn start-begin">Begin the defence</button>
+          </footer>
         </div>
       </div>
     </div>

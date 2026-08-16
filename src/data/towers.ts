@@ -63,6 +63,11 @@ export interface TowerStats {
   unitSpeed: number;
   /** Health fraction at which a fighter breaks off and seeks a hospital. */
   retreatAt: number;
+  /**
+   * The gentler threshold: health below this sends a fighter to the hospital
+   * during a lull, but never out of a fight. See `DEFAULT_REST_AT`.
+   */
+  restAt: number;
   /** Hospitals: hit points restored per second to a wounded fighter. */
   healRate: number;
   /**
@@ -212,6 +217,7 @@ export interface TowerDef {
   unitDps?: number;
   unitSpeed?: number;
   retreatAt?: number;
+  restAt?: number;
   healRate?: number;
 
   /** Shootable buildings: how much the emplacement itself can take. */
@@ -1388,22 +1394,35 @@ export const TOWERS = {
     range: 0,
     turnSpeed: 0,
     houseCapacity: 5,
+    /*
+     * Both upgrades are priced *per head sheltered* against simply raising
+     * another house, which is the only thing they compete with: a house is 80
+     * for 5, or 16 gold a head. At 110 for +2 and 180 for +3 they were 55 and
+     * 60 a head — three to four times the price of sprawling — so no house was
+     * ever improved and the whole path was dead content. They are now 12 and 15
+     * a head, which beats sprawl outright, and the full path is 260 for 18
+     * where four houses would be 320 for 20.
+     *
+     * Building wide is still the answer when you have not paid for Advanced
+     * Construction; upgrading is the answer once you have, and it keeps your
+     * ground free for towers instead of covering it in cottages.
+     */
     upgrades: [
       {
         id: 'timber-frame',
         name: 'Timber Frame',
-        description: 'A second storey jettied over the street. Shelters 7 people instead of 5.',
-        cost: 110,
+        description: 'A second storey jettied over the street. Shelters 10 people instead of 5.',
+        cost: 60,
         requiresTech: 'advanced-construction',
-        stats: { houseCapacity: 7 },
+        stats: { houseCapacity: 10 },
       },
       {
         id: 'townhouse',
         name: 'Townhouse',
-        description: 'A tiled roof, a proper hearth and an attic. Shelters 10 people.',
-        cost: 180,
+        description: 'A tiled roof, a proper hearth and an attic. Shelters 18 people.',
+        cost: 120,
         requires: ['timber-frame'],
-        stats: { houseCapacity: 10 },
+        stats: { houseCapacity: 18 },
       },
     ],
   },
@@ -1421,6 +1440,14 @@ export const TOWERS = {
     turnSpeed: 0,
     housing: 1,
     foodOutput: 6,
+    /*
+     * A second field is not free either — it is 70 gold *and* a housing place
+     * for the farmer, so about 85 all in for 6 food, a shade over 14 a bushel.
+     * Plough Horse at 140 for +5 was 28 a bushel, twice the price of just
+     * ploughing more ground, so nobody ever bought it. At 95 for +7 it is 13.6,
+     * which is cheaper than another farm, takes no extra housing and no extra
+     * ground. Husbandry is what you pay for the privilege.
+     */
     upgrades: [
       {
         id: 'scarecrow',
@@ -1432,10 +1459,10 @@ export const TOWERS = {
       {
         id: 'plough-horse',
         name: 'Plough Horse',
-        description: 'A horse at the plough turns far more ground. Harvest 6 to 11.',
-        cost: 140,
+        description: 'A horse at the plough turns far more ground. Harvest 6 to 13.',
+        cost: 95,
         requiresTech: 'husbandry',
-        stats: { foodOutput: 11 },
+        stats: { foodOutput: 13 },
       },
     ],
   },
@@ -1477,6 +1504,17 @@ export function towerDef(id: TowerId): TowerDef {
 export const ALL_TOWERS = Object.keys(TOWERS) as TowerId[];
 
 /**
+ * How hurt a fighter has to be before he will spend a lull at the hospital.
+ *
+ * Deliberately far above every post's `retreatAt` (0.2–0.45). The retreat
+ * threshold answers "I am about to die"; this one answers "there is nothing to
+ * do and I am carrying a wound", and it only ever applies when his post has no
+ * target at all — anything walking into reach sends him straight back. A post
+ * can override it, but nothing does yet.
+ */
+export const DEFAULT_REST_AT = 0.7;
+
+/**
  * Resolve a tower's live numbers from the upgrades it has actually bought.
  * Upgrades are applied in the order they are declared, so a later entry that
  * touches the same stat wins regardless of the order they were purchased in.
@@ -1505,6 +1543,7 @@ export function statsFor(def: TowerDef, purchased: ReadonlySet<string>): TowerSt
     unitDps: def.unitDps ?? 0,
     unitSpeed: def.unitSpeed ?? 0,
     retreatAt: def.retreatAt ?? 0,
+    restAt: def.restAt ?? DEFAULT_REST_AT,
     healRate: def.healRate ?? 0,
     buildingHp: def.buildingHp ?? 0,
     selfRepair: def.selfRepair ?? 0,

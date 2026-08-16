@@ -13,6 +13,10 @@
  *                                   not give you, to tell "this roster cannot
  *                                   hold" apart from "it cannot afford to"
  *   npm run balance -- --debug      print why a purchase could not be made
+ *   npm run balance -- --map=hollow-way
+ *                                   fight over different ground. The route is
+ *                                   what a map is, so this is a real balance
+ *                                   question and not a reskin
  *   npm run balance -- --spread     diagnostic: build along the whole road
  *                                   instead of packing one stretch of it
  *
@@ -46,7 +50,7 @@ declare const process: {
 };
 
 import { mulberry32 } from '../src/core/rng';
-import type { BuildLot } from '../src/data/maps';
+import { DEFAULT_MAP, MAPS, type BuildLot, type MapDef } from '../src/data/maps';
 import { NATION_ORDER, NATIONS, type NationId } from '../src/data/nations';
 import { TECHS, type TechId } from '../src/data/tech';
 import { statsFor, towerDef, type TowerDef, type TowerId } from '../src/data/towers';
@@ -379,8 +383,14 @@ interface WaveRecord {
 class FakePlayer {
   private readonly game: Game;
   private readonly strategy: Strategy;
-  /** Spots to try for a tower that wants to cover the road, nearest first. */
-  private readonly combatSpots: Array<{ x: number; y: number }>;
+  /**
+   * Spots to try for a tower that wants to cover the road, nearest first —
+   * one list per way in, so the fronts can be dealt between as they open.
+   */
+  private readonly spotsByRoute: Array<{
+    fromWave: number;
+    spots: Array<{ x: number; y: number }>;
+  }>;
   /** Spots for houses and farms, which want to be out of the way instead. */
   private readonly economySpots: Array<{ x: number; y: number }>;
   /** What was bought this round, for the report. */
@@ -400,13 +410,28 @@ class FakePlayer {
     this.game = game;
     this.strategy = STRATEGIES[game.nation];
 
-    const spots: Array<{ x: number; y: number; toPath: number }> = [];
+    // Inside the city walls is reserved for plots, not free building.
+    const wallsAt = Math.min(...game.map.def.castle.blocks.map((b) => b.left));
+
+    const spots: Array<{ x: number; y: number; toPath: number; route: number }> = [];
     for (let x = 30; x < game.map.width - 30; x += 16) {
       for (let y = 30; y < game.map.height - 30; y += 16) {
-        // Inside the city walls is reserved for plots, not free building.
-        if (x > game.map.def.castle.left - 10) continue;
-        const toPath = game.map.path.distanceToPoint(x, y);
-        spots.push({ x, y, toPath });
+        if (x > wallsAt - 10) continue;
+        // On a map where only the hills take a foundation, nothing else is a
+        // candidate at all — and the distance that matters is to the nearest
+        // route of several, not to "the" road.
+        if (game.map.hills && !game.map.onHill(x, y, 14)) continue;
+
+        let toPath = Infinity;
+        let route = 0;
+        game.map.routes.forEach((lane, i) => {
+          const d = lane.path.distanceToPoint(x, y);
+          if (d < toPath) {
+            toPath = d;
+            route = i;
+          }
+        });
+        spots.push({ x, y, toPath, route });
       }
     }
 
@@ -419,20 +444,58 @@ class FakePlayer {
     // makes the defence pack itself into one stretch: the nearest free spot to
     // the road is always right beside the last one taken. That is not a
     // detail, it is most of why these runs win — see SPREAD.
-    const inBand = spots.filter((s) => s.toPath >= 42 && s.toPath <= 190);
-    this.combatSpots = (
-      SPREAD
-        ? inBand.sort(
-            (a, b) =>
-              game.map.path.nearestDistance(a.x, a.y) - game.map.path.nearestDistance(b.x, b.y),
-          )
-        : inBand.sort((a, b) => a.toPath - b.toPath)
-    ).map(({ x, y }) => ({ x, y }));
+    // A hill map has no "beside the road" band to speak of: the hills are
+    // wherever they are, and every one of them is a candidate.
+    const inBand = game.map.hills
+      ? spots
+      : spots.filter((s) => s.toPath >= 42 && s.toPath <= 190);
 
-    this.economySpots = spots
-      .filter((s) => s.toPath > 110)
+    const ordered = SPREAD
+      ? inBand.sort(
+          (a, b) =>
+            game.map.path.nearestDistance(a.x, a.y) - game.map.path.nearestDistance(b.x, b.y),
+        )
+      : inBand.sort((a, b) => a.toPath - b.toPath);
+
+    /*
+     * One list per way in, kept apart rather than merged.
+     *
+     * Two things go wrong if they are merged. Fill the best front first and the
+     * player never defends the others at all, and loses the moment a second one
+     * opens. Deal between all of them from wave one and it builds two thirds of
+     * its defence where nothing will walk for another five waves. Keeping the
+     * fronts separate lets `combatSpots` deal only between the ones that have
+     * actually opened. Within a front it is still nearest-first, so each front's
+     * defence packs itself, which is what works.
+     */
+    this.spotsByRoute = game.map.routes.map((route, i) => ({
+      fromWave: route.fromWave,
+      spots: ordered.filter((s) => s.route === i).map(({ x, y }) => ({ x, y })),
+    }));
+
+    // Houses and farms go as far from the fighting as the map allows. Where
+    // every foundation is a hill there is no "far" to speak of, so it settles
+    // for the furthest hills rather than filtering itself down to nothing.
+    const quiet = game.map.hills ? spots : spots.filter((s) => s.toPath > 110);
+    this.economySpots = quiet
       .sort((a, b) => b.toPath - a.toPath)
       .map(({ x, y }) => ({ x, y }));
+  }
+
+  /**
+   * Where a tower could go, best first — dealt between whichever fronts are
+   * open for the wave being shopped for, and only those.
+   */
+  private get combatSpots(): Array<{ x: number; y: number }> {
+    const live = this.spotsByRoute.filter((r) => this.nextWave >= r.fromWave);
+    const open = live.length > 0 ? live : this.spotsByRoute;
+
+    const dealt: Array<{ x: number; y: number }> = [];
+    const total = open.reduce((sum, r) => sum + r.spots.length, 0);
+    for (let i = 0; dealt.length < total; i++) {
+      for (const route of open) if (i < route.spots.length) dealt.push(route.spots[i]);
+    }
+    return dealt;
   }
 
   /** Everything the player does between two waves. */
@@ -637,9 +700,18 @@ class FakePlayer {
     const previous = game.selectedTowerId;
     game.selectedTowerId = id;
 
+    // On a map with named chokes those are the only places a wall can go, and
+    // the late ones — nearest the gates — are worth the most.
+    const spots = game.map.def.chokes
+      ? [...game.map.def.chokes]
+          .sort((a, b) => b.x - a.x)
+          .map((choke) => ({ x: choke.x, y: choke.y }))
+      : [0.82, 0.74, 0.66, 0.58, 0.5, 0.42].map((f) =>
+          game.map.path.positionAt(game.map.path.length * f),
+        );
+
     let placed = false;
-    for (const fraction of [0.82, 0.74, 0.66, 0.58, 0.5, 0.42]) {
-      const point = game.map.path.positionAt(game.map.path.length * fraction);
+    for (const point of spots) {
       if (game.placementStatus(point.x, point.y) !== 'ok') continue;
       if (game.tryPlaceTower(point.x, point.y)) {
         this.bought.push(towerDef(id).name);
@@ -763,7 +835,12 @@ interface RunResult {
   waves: WaveRecord[];
 }
 
-function runGame(nation: NationId, seed: number, startingGold = DESIGN_STARTING_GOLD): RunResult {
+function runGame(
+  nation: NationId,
+  seed: number,
+  startingGold = DESIGN_STARTING_GOLD,
+  map: MapDef = DEFAULT_MAP,
+): RunResult {
   // Seed the world. Everything random in the simulation — crow flocks, which
   // trails open, whether a shot connects — goes through Math.random, so
   // replacing it is enough to make a run reproducible.
@@ -772,7 +849,7 @@ function runGame(nation: NationId, seed: number, startingGold = DESIGN_STARTING_
   Math.random = rand;
 
   try {
-    const game = new Game(nation);
+    const game = new Game(nation, map);
     game.startingGold = startingGold;
     game.reset();
 
@@ -844,6 +921,16 @@ function main(): void {
   // separate "this roster cannot hold" from "this roster cannot afford to".
   const goldArg = args.find((a) => a.startsWith('--gold='));
   const startingGold = goldArg ? Number(goldArg.slice(7)) : DESIGN_STARTING_GOLD;
+  // Which ground to fight over. The route is what a map *is*, so a second one
+  // is a genuinely different balance question, not a reskin.
+  const mapArg = args.find((a) => a.startsWith('--map='));
+  const map = mapArg ? MAPS.find((m) => m.id === mapArg.slice(6)) : DEFAULT_MAP;
+  if (!map) {
+    console.error(`Unknown map: ${mapArg?.slice(6)}`);
+    console.error(`Known: ${MAPS.map((m) => m.id).join(', ')}`);
+    process.exitCode = 1;
+    return;
+  }
   const named = args.filter((a) => !a.startsWith('--')) as NationId[];
 
   const nations = named.length
@@ -869,7 +956,7 @@ function main(): void {
 
     const results: RunResult[] = [];
     for (let i = 0; i < RUNS_PER_NATION; i++) {
-      const result = runGame(nation, 0x5eed_0000 + i * 7919, startingGold);
+      const result = runGame(nation, 0x5eed_0000 + i * 7919, startingGold, map);
       results.push(result);
       printRun(result);
     }

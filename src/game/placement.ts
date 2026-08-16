@@ -8,6 +8,8 @@ export type PlacementError =
   | 'off-map'
   | 'on-path'
   | 'off-path'
+  | 'off-hill'
+  | 'no-choke'
   | 'blocked'
   | 'occupied'
   | 'too-expensive'
@@ -16,6 +18,29 @@ export type PlacementError =
 
 /** Extra breathing room so towers never look like they touch the road. */
 const PATH_CLEARANCE = 3;
+
+/**
+ * How close to a named choke a gatehouse must be dropped. Generous, because a
+ * choke is a *place* rather than a pixel — the wall snaps to the middle of the
+ * gap once it is taken.
+ */
+export const CHOKE_GRAB = 58;
+
+/** The choke nearest a point, if one is close enough to build in. */
+export function chokeNear(map: GameMap, x: number, y: number) {
+  const chokes = map.chokes;
+  if (!chokes) return null;
+  let best = null;
+  let bestDist = CHOKE_GRAB * CHOKE_GRAB;
+  for (const choke of chokes) {
+    const d = (choke.x - x) ** 2 + (choke.y - y) ** 2;
+    if (d <= bestDist) {
+      bestDist = d;
+      best = choke;
+    }
+  }
+  return best;
+}
 
 /**
  * Bloons-style free placement: anywhere that is on the map, clear of the road,
@@ -53,15 +78,34 @@ export function checkPlacement(
 
   if (x - r < 0 || y - r < 0 || x + r > map.width || y + r > map.height) return 'off-map';
 
-  const toPath = map.path.distanceToPoint(x, y);
-
-  if (def.placement === 'path') {
-    // A gatehouse has to straddle the main road, not sit beside it or on a trail.
-    if (toPath > map.pathRadius * 0.6) return 'off-path';
+  /*
+   * Two different rules about ground, and a map picks one.
+   *
+   * A map with **hills** has no roads to keep clear of: the enemy crosses open
+   * ground wherever it likes, and the hills are the only footing a building
+   * can have. A map without them is the original arrangement — build anywhere
+   * that is not the road. Layering both would mean a hill that happened to lie
+   * near a route was silently unbuildable, which is exactly the kind of rule a
+   * player cannot see.
+   */
+  if (map.hills) {
+    if (def.placement === 'path') {
+      // Nothing to straddle on open sand, so a wall goes where the ground
+      // narrows and nowhere else. Those places are named on the map.
+      if (!chokeNear(map, x, y)) return 'no-choke';
+    } else if (!map.onHill(x, y, r * 0.5)) {
+      return 'off-hill';
+    }
   } else {
-    if (toPath < map.pathRadius + r + PATH_CLEARANCE) return 'on-path';
-    for (const trail of map.trails) {
-      if (trail.path.distanceToPoint(x, y) < trail.radius + r + PATH_CLEARANCE) return 'on-path';
+    const toPath = map.path.distanceToPoint(x, y);
+    if (def.placement === 'path') {
+      // A gatehouse has to straddle the main road, not sit beside it or on a trail.
+      if (toPath > map.pathRadius * 0.6) return 'off-path';
+    } else {
+      if (toPath < map.pathRadius + r + PATH_CLEARANCE) return 'on-path';
+      for (const trail of map.trails) {
+        if (trail.path.distanceToPoint(x, y) < trail.radius + r + PATH_CLEARANCE) return 'on-path';
+      }
     }
   }
 

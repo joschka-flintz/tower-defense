@@ -145,10 +145,7 @@ export const NATIONS = {
       // emplacements standing.
       costs: { 'field-medicine': 0.55, hospital: 0.7 },
     },
-    perks: [
-      'Field Medicine costs 45% less, and a Field Hospital 30% less.',
-      'No Stone Gatehouse — nothing here stops the enemy walking.',
-    ],
+    perks: ['Field Medicine costs 45% less, and a Field Hospital 30% less.'],
     // The roster exists and runs; none of it has been balanced against the
     // wave table yet.
     playable: false,
@@ -166,6 +163,10 @@ export const NATIONS = {
     towers: ['archer', 'houndmaster', 'crossbow', 'house', 'farm', 'hospital', 'gatehouse'],
     gateSlots: ['rock-thrower', 'hot-oil'],
     lotBuildings: ['research'],
+    // Intended, not built: nothing in the code gives them any of this yet. It
+    // is written down so the design is visible on the start screen while the
+    // specifics are still being argued about.
+    perks: ['Planned: a housing and farming realm — cheaper shelter, richer fields. Not built yet.'],
     playable: false,
   },
 } as const satisfies Record<NationId, NationDef>;

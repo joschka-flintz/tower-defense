@@ -42,12 +42,34 @@ Two conventions keep it easy to extend:
 2. **Logic and drawing are separate.** Switching to real sprites, or tilting the camera to a
    slight 3/4 angle, only touches `src/render/Renderer.ts`.
 
+## Starting a game
+
+The game opens on a **start screen**: the rules on the left, and on the right the four things a
+game is made of — **play mode**, **nation**, **map**, and the **starting gold**. Anything that has
+not been balanced yet says so on its own card, and the line above the Begin button repeats the
+warning for whatever you have actually picked.
+
+One play mode can be chosen today, *The Long Siege*, which is the game as it has always been.
+*Campaign* — a run of linked battles carrying your realm forward — is listed but locked, as a
+statement of intent rather than something you can start. A mode is the shape of the contest (lives,
+how many waves) and lives in `src/data/modes.ts`; adding another should be an entry in that file
+and nothing else.
+
+**Menu** in the dev bar (and *Back to Menu* on the win/lose screen) returns to it. The board is left
+standing and the simulation stops while the screen is up, so opening the menu mid-game and
+dismissing it again costs nothing. **New game** beside it restarts the same setup. Nation and
+starting gold are chosen only on the start screen — the dev bar no longer duplicates them.
+
 ## Controls
 
 - Click a tower in the **Build** panel, then click the map to place it.
 - Green ring = valid spot, red ring = blocked (road, scenery, another tower, or not enough gold).
 - Right-click or `Esc` cancels building.
-- **Click a placed tower** to see its range and buy upgrades.
+- **Click a placed tower** to see its range, buy upgrades, or **sell** it.
+- **Selling** pays back half of everything spent on that building, upgrades included, and is the
+  last row of its panel. Selling a gatehouse takes its turrets with it and pays for those too. The
+  one thing you cannot sell is a house whose roof your other buildings are counted under — sell a
+  tower first, and the house after.
 - A **gatehouse is three separate things to click**: the gate in the middle (repair and reinforce)
   and each of the two turrets (choose Rock Thrower or Hot Oil; once built they behave as ordinary
   towers with their own panel).
@@ -71,11 +93,47 @@ The **gatehouse/catapult split** is the point of the pair. Having both — a wal
 *and* the artillery to shell it while it stands there — was the strongest thing in the game, so
 each realm gets exactly one of the two.
 
-There is no pre-game chooser yet. The **Nation** dropdown in the dev bar picks one; changing it and
-pressing *New game* restarts. The Kingdom is the default.
+Pick a nation on the start screen. The **Nation** dropdown in the dev bar still switches mid-session
+(it restarts the game), which is the quicker route when testing.
 
 A tower that no nation lists is not deleted, only unoffered — it stays in `src/data/towers.ts`
 ready for whoever ends up fielding it.
+
+## Maps
+
+A map is mostly its **route**: where the enemy walks, and where you are allowed to stand. Every map
+shares the same wave table and the same economy. Maps live in `src/data/maps.ts`.
+
+| Map | Idea | State |
+| --- | --- | --- |
+| **Classic Meadow** | Open pasture, four long straights, junctions at 10%, 38% and 52% along the road. | The ground everything was tuned on |
+| **The Hollow Way** | A coiling sunken road that doubles back on itself twice, with its two halves running a hundred units apart down the middle of the board — one cluster there covers two stretches at once. Its northern lane joins barely a sixth of the way along. | **Not balanced** |
+| **Sand of the Three Gates** | No road at all. Open desert, three broad fronts crossing it from the west, and **three gates** to hold. Buildings stand only on the green hills; a gatehouse only in a marked gap. | **Not balanced** |
+
+`npm run balance -- --map=<id>` fights the harness over a given map.
+
+### Open ground
+
+The desert map runs on two rules the road maps do not have, both of which are properties of the map
+rather than special cases in the engine:
+
+- **Several ways in.** A map may declare more than one route, each ending at its own gate in the
+  city wall. Every wave is split evenly between whichever fronts have opened, so the number of
+  enemies is exactly what the wave table says — they simply arrive in two or three places. Fronts
+  open on set waves (the second on wave 4, the third on wave 7) so the opening is not a guess about
+  which gate to guard. A gatehouse blocks the front it stands on and no other.
+- **Hills instead of verges.** Where a map declares hills, they are the only ground that takes a
+  foundation, and the keep-clear-of-the-road rule does not apply — there is no road. A gatehouse
+  goes in one of a handful of gaps between hills; pick the gatehouse in the build panel and the
+  gaps light up on the board.
+- **The enemy keeps to the sand.** Hills are solid ground it walks *around*. Nothing draws the
+  enemy's path on such a map: the ground is turned into a walkable grid and each front finds its own
+  way from where it enters to the gate it is making for, preferring the middle of a corridor and
+  squeezing through a gap only when there is no way round. A front broadens over open sand and files
+  through a narrow place. Edit the hills and the fronts re-route themselves.
+
+Press **`P`** in game to draw the fronts and the corridor each has to walk in. That is the way to
+see what moving a patch of hill did to the enemy's path.
 
 ### Emplacements can be shot at
 
@@ -88,6 +146,11 @@ gatehouse standing, so it can simply be re-manned).
 Two ways to patch them up:
 
 - **A field hospital in reach** mends damaged emplacements as well as treating wounded fighters.
+  A fighter falls back at his post's **retreat** threshold (20–45%, shown on the panel), and will
+  also spend a **lull** at the ward if he is under 70% and his post has had nothing in reach for a
+  couple of seconds — but only once he has been in the fight that wave, and he goes straight back
+  the instant anything comes into reach. Emplacements have no equivalent: they are mended whenever
+  a hospital covers them, and pay for it by not shooting.
 - **A siege engine's own crew** can mend it unaided. Below half structure a catapult stands down
   and does not fire again until it is whole. *Carpenter's Tools* makes that much quicker.
 
@@ -136,7 +199,7 @@ Which of these you can build depends on your nation.
 | Houndmaster | 90 | Wardens | Sends a dog onto the road to pin an enemy and bite it. |
 | Crossbowman | 45 | both | The archer's opposite: short reach, very slow to crank, but hits far harder and rarely misses. For the Kingdom it is the *only* thing that shoots, which is why it can buy a ranging sight. Upgrades: windlass crank, steel prod, ranging sight, fire bolts. |
 | Swordsman | 60 | both | Steps onto the road and holds an enemy in place, like a dog — but he has real health, **medium armour**, and the enemy hits back. Below 35% health he breaks off and walks to the nearest Field Hospital. Upgrades: mail, a better sword, *Plate Armour* (heavy armour, but noticeably slower), and the *Wirbelattacke* — a full turn with the blade every 3 seconds that cuts everything within reach. |
-| Field Hospital | 100 | both | Does not attack (needs Field Medicine). Wounded fighters withdraw here and are healed back to fighting fitness, then return to their post; damaged emplacements in reach are mended too. It has a **reach** (210) — a man hurt outside it has nowhere to fall back to, so where you put it matters. Upgrades: trained surgeons (30 → 58 per second), stretcher bearers (reach 210 → 320). |
+| Field Hospital | 100 | both | Does not attack (needs Field Medicine). Wounded fighters withdraw here and are healed back to fighting fitness, then return to their post; damaged emplacements in reach are mended too. It has a **reach** (210), which covers **posts**: it takes any man whose post stands inside it, however far his own fighting has carried him. A post outside it has nowhere to fall back to, so where you put it matters. Upgrades: trained surgeons (30 → 58 per second), stretcher bearers (reach 210 → 320). |
 | Catapult | 180 | Marches | Slow arcing stones that **always hit** and damage everything in a blast radius. Its crew can mend it, at the cost of not shooting. |
 | Stone Gatehouse | 180 | Kingdom | Built **across the road** (needs Advanced Construction). Enemies must break the gate before they can pass, which is the one thing that stops a *crowd* rather than a single enemy — for the Kingdom that makes it the keystone rather than a luxury. Only the gate breaks; the masonry and its two turrets survive and keep fighting. Repair is paid for and never happens automatically; the gate can also be reinforced (700 → 1200 → 2000). Each turret takes a Rock Thrower (blunt) or Hot Oil (fire, needs Fire Projectiles). |
 | Scholars' Hall | 150 | both | Does not attack. Develops technologies that apply to the whole realm. |
@@ -175,9 +238,10 @@ genuinely durable, while a lone swordsman or knight is still all or nothing.
 Two economies sit on top of gold, and they are deliberately *not* the same shape:
 
 - **Housing is a hard cap.** Every combat building needs people to man it — one each, farms one for
-  the farmer, and **two** for either knight, who does not go to war alone. Houses shelter 5, then 7,
-  then 10 with upgrades (the later two need Advanced Construction, and the building visibly grows
-  each time). A house on a **city plot** is built properly from the outset: it comes with its
+  the farmer, and **two** for either knight, who does not go to war alone. Houses shelter 5, then 10,
+  then 18 with upgrades (the later two need Advanced Construction, and the building visibly grows
+  each time), and both upgrades shelter a head more cheaply than raising another cottage would.
+  A house on a **city plot** is built properly from the outset: it comes with its
   Timber Frame already up, free and without the research. No spare housing, no new tower.
 
 Houses and farms can be built **anywhere**, like any other building. The city walls also hold
@@ -231,7 +295,7 @@ valve, and it costs you gold you wanted for defence.
 **Crows** are an occurrence rather than an enemy: they ignore the road, cannot be attacked, and
 only care about farms. A flock can spoil up to half of an unprotected field's harvest. The
 *Scarecrow* upgrade keeps them off entirely; *Plough Horse* (needs Husbandry) raises a field from
-6 to 11.
+6 to 13 — cheaper per bushel than breaking new ground, and it costs no extra housing.
 
 ### Enemies fight back
 

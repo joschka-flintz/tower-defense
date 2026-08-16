@@ -1,7 +1,6 @@
 import { ARMOR_LABEL, effectivenessRow } from '../data/armor';
 import type { Creep } from '../game/Creep';
 import { DOG_ARMOR } from '../game/Dog';
-import { NATION_ORDER, NATIONS, type NationId } from '../data/nations';
 import { TECH_ORDER, TECHS, type TechId } from '../data/tech';
 import { DAMAGE_LABEL, towerDef, type TowerDef, type TowerId } from '../data/towers';
 import {
@@ -25,6 +24,12 @@ export interface Hud {
   update(): void;
 }
 
+/** What the HUD needs from the page around it. */
+export interface HudHooks {
+  /** Called when the player asks to go back to the start screen. */
+  onMenu(): void;
+}
+
 /** One buyable row in the tower panel: either an upgrade or a technology. */
 interface Option {
   id: string;
@@ -36,6 +41,11 @@ interface Option {
   blocker: string | null;
   /** How deep in the prerequisite tree this sits; 0 is a root. */
   depth: number;
+  /**
+   * A row that pays *out* rather than costs. Rendered apart from the upgrades,
+   * at the bottom, so demolishing is never one misclick away from an upgrade.
+   */
+  sell?: boolean;
 }
 
 /**
@@ -80,7 +90,7 @@ function upkeepLabel(def: TowerDef): string {
   return parts.join(' · ');
 }
 
-export function createHud(game: Game): Hud {
+export function createHud(game: Game, hooks: HudHooks): Hud {
   const goldEl = required<HTMLElement>('#stat-gold');
   const livesEl = required<HTMLElement>('#stat-lives');
   const waveEl = required<HTMLElement>('#stat-wave');
@@ -115,10 +125,22 @@ export function createHud(game: Game): Hud {
    */
   let lastRoster = '';
 
+  /**
+   * The ground rule for the map being played, alongside the controls.
+   *
+   * Where a building may go is the one thing a player cannot work out by
+   * looking at the panel, and it is not the same on every map — so it is said
+   * here rather than left to be discovered by clicking on sand.
+   */
+  const groundHint = required<HTMLElement>('#shop-ground');
+
   function buildShop(): void {
     shopEl.innerHTML = '';
     buttons.clear();
     shopTitle.textContent = game.nationDef.name;
+    groundHint.textContent = game.map.hills
+      ? 'Open ground: the enemy crosses it wherever it likes. Buildings stand only on the hills, and a gatehouse only in a marked gap.'
+      : '';
     // The blurb plus whatever rules this nation bends, so the perk is
     // discoverable rather than something you have to notice in the numbers.
     shopTitle.title = [game.nationDef.blurb, ...(game.nationDef.perks ?? [])].join('\n');
@@ -143,7 +165,7 @@ export function createHud(game: Game): Hud {
       shopEl.appendChild(btn);
       buttons.set(id, btn);
     }
-    lastRoster = game.roster.join(',');
+    lastRoster = `${game.roster.join(',')}#${game.map.def.id}`;
   }
 
   buildShop();
@@ -154,27 +176,16 @@ export function createHud(game: Game): Hud {
   const tpOptions = required<HTMLElement>('#tp-options');
   const closeTowerBtn = required<HTMLButtonElement>('#btn-close-tower');
 
-  // Testing aids: the purse a new game starts with, and which nation to play.
-  // There is no pre-game chooser yet, so this dropdown is how the second
-  // nation gets looked at at all.
-  const devGold = required<HTMLInputElement>('#dev-gold');
-  const devNation = required<HTMLSelectElement>('#dev-nation');
+  // Start the same setup over. Nation, map, mode and purse are all chosen on
+  // the start screen, so this deliberately changes none of them.
   const newGameBtn = required<HTMLButtonElement>('#btn-newgame');
-  devGold.value = String(game.startingGold);
+  newGameBtn.addEventListener('click', () => game.reset());
 
-  devNation.innerHTML = NATION_ORDER.map((id) => {
-    const nation = NATIONS[id];
-    const label = nation.playable ? nation.name : `${nation.name} (unbalanced)`;
-    return `<option value="${id}">${label}</option>`;
-  }).join('');
-  devNation.value = game.nation;
-
-  newGameBtn.addEventListener('click', () => {
-    const value = Number(devGold.value);
-    if (Number.isFinite(value) && value >= 0) game.startingGold = Math.round(value);
-    game.nation = devNation.value as NationId;
-    game.reset();
-  });
+  // Both ways back to the start screen. The game keeps running underneath but
+  // the loop stands still while the screen is up, so the board is still there
+  // if the player changes their mind and dismisses it.
+  required<HTMLButtonElement>('#btn-menu').addEventListener('click', () => hooks.onMenu());
+  required<HTMLButtonElement>('#btn-overlay-menu').addEventListener('click', () => hooks.onMenu());
 
   waveBtn.addEventListener('click', () => game.startWave());
   restartBtn.addEventListener('click', () => game.reset());
@@ -189,6 +200,13 @@ export function createHud(game: Game): Hud {
     if (!row) return;
     const id = row.dataset.buy;
     if (!id) return;
+
+    // Demolition is the one action available on more than one kind of
+    // selection, so it is handled before anything else asks what is selected.
+    if (id === 'sell') {
+      game.sellSelected();
+      return;
+    }
 
     if (game.selectedGate) {
       if (id === 'repair') game.repairSelectedGate();
@@ -377,6 +395,32 @@ export function createHud(game: Game): Hud {
     });
   }
 
+  /**
+   * The demolition row, for anything that was paid for and can be pulled down.
+   *
+   * A gatehouse quotes its turrets in the description, because selling it takes
+   * them with it and the refund already includes them — the alternative, a
+   * turret left standing on nothing, is not a thing the board can draw.
+   */
+  function sellOption(what: Tower | Gatehouse): Option {
+    const installed = 'slots' in what ? what.installed.length : 0;
+    const refund = game.sellValue(what);
+    return {
+      id: 'sell',
+      name: `Sell ${what.def.name}`,
+      description:
+        `Pull it down and take back half of everything spent on it.` +
+        (installed > 0
+          ? ` Its ${installed === 1 ? 'turret goes' : 'turrets go'} with it, and ${installed === 1 ? 'is' : 'are'} counted in the refund.`
+          : ''),
+      cost: refund,
+      owned: false,
+      blocker: game.sellBlocker(what),
+      depth: 0,
+      sell: true,
+    };
+  }
+
   function creepStatRows(creep: Creep): Array<[string, string]> {
     const def = creep.def;
     const rows: Array<[string, string]> = [
@@ -509,6 +553,7 @@ export function createHud(game: Game): Hud {
       rows.push(['Health', `${Math.round(hp)} / ${s.unitHp * s.units}`]);
       rows.push(['Armour', ARMOR_LABEL[s.armor]]);
       rows.push(['Retreats at', `${Math.round(s.retreatAt * 100)}%`]);
+      rows.push(['Rests at', `${Math.round(s.restAt * 100)}%`]);
       if (s.units > 1) rows.push(['Fighters', `${tower.units.length} / ${s.units}`]);
       if (s.whirlwindDamage > 0) {
         rows.push(['Sweep', `${s.whirlwindDamage} every ${s.whirlwindInterval}s`]);
@@ -613,11 +658,11 @@ export function createHud(game: Game): Hud {
         : castleGate
           ? castleGateOptions()
           : gate
-            ? gateOptions(gate)
+            ? [...gateOptions(gate), sellOption(gate)]
             : slot
               ? slotOptions(slot)
               : tower
-                ? optionsFor(tower)
+                ? [...optionsFor(tower), sellOption(tower)]
                 : [];
 
     const signature = [
@@ -643,12 +688,14 @@ export function createHud(game: Game): Hud {
     tpOptions.innerHTML = options
       .map((o) => {
         const disabled = o.owned || o.blocker !== null;
-        const tag = o.owned
-          ? `<span class="tp-opt-tag owned">${o.cost === 0 ? 'Built' : 'Owned'}</span>`
-          : `<span class="tp-opt-tag${o.blocker ? ' unaffordable' : ''}">${o.cost} gold</span>`;
+        const tag = o.sell
+          ? `<span class="tp-opt-tag refund">+${o.cost} gold</span>`
+          : o.owned
+            ? `<span class="tp-opt-tag owned">${o.cost === 0 ? 'Built' : 'Owned'}</span>`
+            : `<span class="tp-opt-tag${o.blocker ? ' unaffordable' : ''}">${o.cost} gold</span>`;
         const lock = o.blocker ? `<span class="tp-opt-lock">${o.blocker}</span>` : '';
         return (
-          `<button class="tp-opt${o.owned ? ' owned' : ''}" data-buy="${o.id}"` +
+          `<button class="tp-opt${o.owned ? ' owned' : ''}${o.sell ? ' sell' : ''}" data-buy="${o.id}"` +
           ` data-depth="${Math.min(o.depth, 3)}"${disabled ? ' disabled' : ''}>` +
           `<span class="tp-opt-head"><span class="tp-opt-name">${o.name}</span>${tag}</span>` +
           `<span class="tp-opt-desc">${o.description}</span>${lock}</button>`
@@ -659,9 +706,10 @@ export function createHud(game: Game): Hud {
 
   return {
     update() {
-      // Cheap string compare, so a nation swapped from the console or the dev
-      // bar is picked up without anything having to tell the HUD about it.
-      if (game.roster.join(',') !== lastRoster) buildShop();
+      // Cheap string compare, so a nation or map swapped from the start screen
+      // is picked up without anything having to tell the HUD about it.
+      const signature = `${game.roster.join(',')}#${game.map.def.id}`;
+      if (signature !== lastRoster) buildShop();
 
       renderTowerPanel();
 

@@ -1,17 +1,18 @@
 import { dist2 } from '../core/vec';
 import { CREEPS, type CreepId } from '../data/creeps';
-import { CLASSIC_MEADOW, type BuildLot } from '../data/maps';
+import { DEFAULT_MAP, type BuildLot, type MapDef } from '../data/maps';
+import { DEFAULT_MODE, modeDef, type GameModeDef, type GameModeId } from '../data/modes';
 import { DEFAULT_NATION, nationDef, type NationDef, type NationId } from '../data/nations';
 import { TECHS, techEffects, type TechDef, type TechId } from '../data/tech';
 import { towerDef, type TowerDef, type TowerId } from '../data/towers';
 import { WAVES } from '../data/waves';
 import { Creep } from './Creep';
 import { FireField } from './FireField';
-import { GameMap } from './GameMap';
+import { corridorAt, GameMap, type Lane } from './GameMap';
 import { Crow } from './Crow';
 import { Gatehouse, type GateSlotRef } from './Gatehouse';
 import type { Path } from './Path';
-import { checkPlacement, type PlacementError } from './placement';
+import { checkPlacement, chokeNear, type PlacementError } from './placement';
 import { Projectile } from './Projectile';
 import type { HospitalRef } from './Swordsman';
 import { DEFAULT_MELEE_RECOVERY, Tower } from './Tower';
@@ -98,7 +99,18 @@ export type GameState = 'idle' | 'wave' | 'gameover' | 'victory';
  * as its defence.
  */
 export const DESIGN_STARTING_GOLD = 260;
-const STARTING_LIVES = 20;
+
+/**
+ * What selling a building gives back, as a fraction of everything spent on it —
+ * the building itself plus every upgrade bought for it.
+ *
+ * Half is a real cost, which is the point: a post in the wrong place should be
+ * worth moving, and a board full of pikemen should be worth rebuilding into
+ * something that answers wave 14, but neither should be free. It also has to be
+ * clearly below 1 or the shop becomes a preview mode where you try a tower,
+ * refund it, and try another.
+ */
+export const SELL_REFUND = 0.5;
 /**
  * How much tougher creeps get as the waves go on. The growth is deliberately
  * curved rather than a flat percentage per wave: a linear ramp steep enough
@@ -136,6 +148,10 @@ interface PendingGroup {
   timer: number;
   /** Which route these creeps walk — the main road, or a trail. */
   path: Path;
+  /** The independent route it belongs to, which decides which gates stop it. */
+  routeId: string;
+  /** The lane itself, so a creep can ask how much room it has as it walks. */
+  lane: Lane;
   laneSpread: number;
   joinRemaining: number;
   /** When set, the whole group arrives at once as a block rather than in file. */
@@ -152,15 +168,25 @@ const TRAIL_ACTIVATION_CHANCE = 0.5;
 const TRAIL_SCOUT_IDS: CreepId[] = ['peasant', 'grunt', 'assassin'];
 
 export class Game {
-  readonly map = new GameMap(CLASSIC_MEADOW);
+  /**
+   * The ground being fought over. Swapped by `configure`, which starts the
+   * game over — everything on the board is placed in this map's coordinates,
+   * so a map change can never be anything but a new game.
+   */
+  map: GameMap;
 
   /**
    * Which nation the player is fighting as. It decides the build panel and
-   * nothing else — the wave table, the map and the economy are shared. There
-   * is no pre-game chooser yet, so this is set once at construction; change it
-   * with `setNation`, which necessarily starts the game over.
+   * nothing else — the wave table, the map and the economy are shared. Change
+   * it with `setNation` or `configure`, both of which start the game over.
    */
   nation: NationId;
+
+  /**
+   * The shape of the contest: lives, how many waves, and what the start screen
+   * says about it. See `data/modes.ts`.
+   */
+  mode: GameModeId;
 
   creeps: Creep[] = [];
   towers: Tower[] = [];
@@ -194,7 +220,7 @@ export class Game {
   startingGold = DESIGN_STARTING_GOLD;
 
   gold = this.startingGold;
-  lives = STARTING_LIVES;
+  lives = 0;
   /** 0 before the first wave; otherwise the number of the wave running or last cleared. */
   waveNumber = 0;
   state: GameState = 'idle';
@@ -213,14 +239,44 @@ export class Game {
 
   private pending: PendingGroup[] = [];
 
-  constructor(nation: NationId = DEFAULT_NATION) {
+  constructor(
+    nation: NationId = DEFAULT_NATION,
+    map: MapDef = DEFAULT_MAP,
+    mode: GameModeId = DEFAULT_MODE,
+  ) {
     this.nation = nation;
+    this.map = new GameMap(map);
+    this.mode = mode;
+    this.reset();
+  }
+
+  /**
+   * Set up a new game from the start screen: nation, ground, mode and purse in
+   * one call, followed by exactly one reset. Anything left out is kept.
+   */
+  configure(options: {
+    nation?: NationId;
+    map?: MapDef;
+    mode?: GameModeId;
+    startingGold?: number;
+  }): void {
+    if (options.nation) this.nation = options.nation;
+    if (options.mode) this.mode = options.mode;
+    if (options.map && options.map !== this.map.def) this.map = new GameMap(options.map);
+    if (options.startingGold !== undefined && Number.isFinite(options.startingGold)) {
+      this.startingGold = Math.max(0, Math.round(options.startingGold));
+    }
     this.reset();
   }
 
   /** The roster the current nation fields. */
   get nationDef(): NationDef {
     return nationDef(this.nation);
+  }
+
+  /** The rules of the contest being played. */
+  get modeDef(): GameModeDef {
+    return modeDef(this.mode);
   }
 
   /** Towers the build panel offers, in order. */
@@ -260,11 +316,11 @@ export class Game {
   }
 
   get totalWaves(): number {
-    return WAVES.length;
+    return Math.min(this.modeDef.waves ?? WAVES.length, WAVES.length);
   }
 
   get canStartWave(): boolean {
-    return this.state === 'idle' && this.waveNumber < WAVES.length;
+    return this.state === 'idle' && this.waveNumber < this.totalWaves;
   }
 
   /**
@@ -294,16 +350,47 @@ export class Game {
     this.releaseCrows();
     this.waveNumber++;
     this.state = 'wave';
-    this.pending = WAVES[this.waveNumber - 1].groups.map((group) => ({
-      creepId: group.creepId,
-      remaining: group.count,
-      interval: group.interval,
-      timer: group.delay,
-      path: this.map.path,
-      laneSpread: this.map.pathRadius * LANE_SPREAD,
-      joinRemaining: this.map.path.length,
-      formation: group.formation,
-    }));
+
+    /*
+     * Every group is split across every way in.
+     *
+     * On a one-route map that is a no-op: one route, one share, exactly the
+     * wave the table describes. On a map with three gates it means all three
+     * are attacked every wave, by a third of each group each. The alternative
+     * — dealing whole groups out to routes in turn — leaves the early waves,
+     * which are one or two groups, arriving at one gate chosen at random,
+     * which reads as the map being fickle rather than as a wave being wide.
+     *
+     * The total number of enemies is unchanged either way, so the wave table
+     * keeps meaning what it says.
+     */
+    // Only the fronts that have opened by now. A map whose ways in all open at
+    // wave one — every road map — has the same list every wave.
+    const routes = this.map.routes.filter((route) => this.waveNumber >= route.fromWave);
+    this.pending = [];
+    for (const group of WAVES[this.waveNumber - 1].groups) {
+      for (let i = 0; i < routes.length; i++) {
+        const route = routes[i];
+        // Deal the remainder out to the first routes rather than dropping it.
+        const share =
+          Math.floor(group.count / routes.length) + (i < group.count % routes.length ? 1 : 0);
+        if (share <= 0) continue;
+
+        this.pending.push({
+          creepId: group.creepId,
+          remaining: share,
+          interval: group.interval,
+          timer: group.delay,
+          path: route.path,
+          routeId: route.routeId,
+          lane: route,
+          laneSpread: route.radius * LANE_SPREAD,
+          joinRemaining: route.path.length,
+          formation: group.formation,
+        });
+      }
+    }
+
     this.releaseTrailScouts();
   }
 
@@ -334,6 +421,8 @@ export class Game {
         interval: 0.6 + Math.random() * 0.5,
         timer: 1 + Math.random() * 4,
         path: trail.path,
+        routeId: trail.routeId,
+        lane: trail,
         laneSpread: trail.radius * LANE_SPREAD,
         joinRemaining: trail.joinRemaining,
       });
@@ -390,7 +479,7 @@ export class Game {
       for (const tower of this.allTowers) tower.restorePack(this.meleeRecovery);
       this.settleFood();
       for (const tower of this.towers) tower.resetHarvest();
-      this.state = this.waveNumber >= WAVES.length ? 'victory' : 'idle';
+      this.state = this.waveNumber >= this.totalWaves ? 'victory' : 'idle';
     }
   }
 
@@ -502,10 +591,13 @@ export class Game {
 
     for (const gate of this.gates) {
       if (gate.isOpen) continue;
-      const remainingAtGate = this.map.path.length - gate.blockDistance;
+      const route = this.map.lane(gate.routeId);
+      const remainingAtGate = route.path.length - gate.blockDistance;
 
       for (const creep of this.creeps) {
         if (!creep.alive) continue;
+        // A wall across one way in is no obstacle at all to the others.
+        if (creep.routeId !== gate.routeId) continue;
         // A gate built before this creep's trail joins the main road is not
         // on its route at all — the trail bypasses it entirely.
         if (remainingAtGate > creep.joinRemaining) continue;
@@ -518,6 +610,14 @@ export class Game {
         gate.damageGate(creep.def.siege * dt);
       }
     }
+  }
+
+  /**
+   * How much room a lane has at a given point, for creeps that must keep to
+   * open ground. Null on a road map, where the road is the room.
+   */
+  private corridorFor(lane: Lane): ((distance: number) => number) | null {
+    return lane.corridor ? (distance: number) => corridorAt(lane, distance) : null;
   }
 
   private spawn(dt: number): void {
@@ -533,9 +633,16 @@ export class Game {
       }
 
       while (group.timer <= 0 && group.remaining > 0) {
-        this.creeps.push(
-          new Creep(CREEPS[group.creepId], group.path, hpScale, group.laneSpread, group.joinRemaining),
+        const creep = new Creep(
+          CREEPS[group.creepId],
+          group.path,
+          hpScale,
+          group.laneSpread,
+          group.joinRemaining,
         );
+        creep.routeId = group.routeId;
+        creep.corridor = this.corridorFor(group.lane);
+        this.creeps.push(creep);
         group.remaining--;
         group.timer += group.interval;
       }
@@ -559,12 +666,13 @@ export class Game {
       const rank = Math.floor(i / columns);
       // Spread the columns evenly across the road, centred on the middle.
       const offset = columns > 1 ? (column / (columns - 1) - 0.5) * 2 : 0;
-      this.creeps.push(
-        new Creep(def, group.path, hpScale, 0, group.joinRemaining, {
-          lane: offset * group.laneSpread,
-          startDistance: -rank * rankGap,
-        }),
-      );
+      const creep = new Creep(def, group.path, hpScale, 0, group.joinRemaining, {
+        lane: offset * group.laneSpread,
+        startDistance: -rank * rankGap,
+      });
+      creep.routeId = group.routeId;
+      creep.corridor = this.corridorFor(group.lane);
+      this.creeps.push(creep);
     }
     group.remaining = 0;
   }
@@ -682,24 +790,35 @@ export class Game {
     const def = towerDef(this.selectedTowerId);
     if (checkPlacement(this.placementWorld, def, x, y) !== 'ok') return false;
 
-    this.gold -= this.costOf(def);
+    const paid = this.costOf(def);
+    this.gold -= paid;
 
     if (def.placement === 'path') {
-      // Snap the gatehouse onto the road and square it across the route.
-      const at = this.map.path.nearestDistance(x, y);
-      const point = this.map.path.positionAt(at);
-      this.gates.push(
-        new Gatehouse(
-          def,
-          point.x,
-          point.y,
-          point.angle + this.gateRotation,
-          at,
-          this.map.pathRadius,
-        ),
+      // On a map with named chokes the wall goes in the gap, squared the way
+      // the gap faces; everywhere else it snaps onto the road it straddles.
+      const choke = this.map.chokes.length > 0 ? chokeNear(this.map, x, y) : null;
+      const route = this.map.lane(choke?.route ?? 'main');
+      const stance = choke
+        ? this.map.chokeStance(choke)
+        : (() => {
+            const at = route.path.nearestDistance(x, y);
+            const point = route.path.positionAt(at);
+            return { x: point.x, y: point.y, angle: point.angle, at };
+          })();
+
+      const gate = new Gatehouse(
+        def,
+        stance.x,
+        stance.y,
+        stance.angle + this.gateRotation,
+        stance.at,
+        this.map.gateHalfWidth,
+        route.routeId,
       );
+      gate.goldSpent = paid;
+      this.gates.push(gate);
     } else {
-      this.towers.push(this.raise(def, x, y));
+      this.towers.push(this.raise(def, x, y, false, paid));
     }
     return true;
   }
@@ -708,9 +827,10 @@ export class Game {
    * Put a building up, flagging it if a wave is already running. Everything
    * that creates a `Tower` goes through here so the flag can never be missed.
    */
-  private raise(def: TowerDef, x: number, y: number, sheltered = false): Tower {
+  private raise(def: TowerDef, x: number, y: number, sheltered = false, paid = 0): Tower {
     const tower = new Tower(def, x, y, sheltered);
     tower.raisedMidWave = this.state === 'wave';
+    tower.goldSpent = paid;
     return tower;
   }
 
@@ -727,9 +847,12 @@ export class Game {
     // City plots, the market and the city gate sit inside the walls, away from
     // everything else.
     const castle = this.map.def.castle;
-    const gate = this.castleGatePosition;
-    if (Math.hypot(gate.x - x, gate.y - y) <= castle.gateHalf + 12) {
-      return { kind: 'castle-gate', x: gate.x, y: gate.y };
+    // Any of the city's own gates opens the same panel: reinforcing them is a
+    // realm-wide decision, not a repair to one doorway.
+    for (const gate of this.castleGates) {
+      if (Math.hypot(gate.x - x, gate.y - y) <= gate.half + 12) {
+        return { kind: 'castle-gate', x: gate.x, y: gate.y };
+      }
     }
     if (Math.hypot(castle.market.x - x, castle.market.y - y) <= 46) {
       return { kind: 'market', x: castle.market.x, y: castle.market.y };
@@ -820,10 +943,20 @@ export class Game {
       : null;
   }
 
-  /** Where the road meets the city wall. */
+  /**
+   * Every gate in the city wall, in the order the map declares them — which is
+   * the order the routes are declared in, so route *i* ends at gate *i*.
+   */
+  get castleGates(): Array<{ x: number; y: number; half: number }> {
+    return this.map.def.castle.blocks.flatMap((block) =>
+      block.gates.map((gate) => ({ x: block.left, y: gate.y, half: gate.half })),
+    );
+  }
+
+  /** Where the first route meets the city wall. */
   get castleGatePosition(): { x: number; y: number } {
-    const castle = this.map.def.castle;
-    return { x: castle.left, y: (castle.top + castle.bottom) / 2 };
+    const first = this.castleGates[0];
+    return first ? { x: first.x, y: first.y } : { x: this.map.width, y: this.map.height / 2 };
   }
 
   /** Why the keep gate cannot be reinforced yet, or null when it can be. */
@@ -860,8 +993,9 @@ export class Game {
     if (this.towers.some((t) => Math.hypot(t.x - lot.x, t.y - lot.y) < 4)) return false;
 
     const def = towerDef(lot.accepts as TowerId);
-    this.gold -= this.costOf(def);
-    const tower = this.raise(def, lot.x, lot.y, true);
+    const paid = this.costOf(def);
+    this.gold -= paid;
+    const tower = this.raise(def, lot.x, lot.y, true, paid);
     this.towers.push(tower);
     this.selected = tower;
     return true;
@@ -931,6 +1065,7 @@ export class Game {
     if (!upgrade) return false;
 
     this.gold -= upgrade.cost;
+    gate.goldSpent += upgrade.cost;
     gate.applyUpgrade(id);
     return true;
   }
@@ -954,12 +1089,87 @@ export class Game {
     if (this.gold < this.costOf(def)) return false;
 
     const spot = gate.slotPosition(index);
-    this.gold -= this.costOf(def);
-    const tower = this.raise(def, spot.x, spot.y);
+    const paid = this.costOf(def);
+    this.gold -= paid;
+    const tower = this.raise(def, spot.x, spot.y, false, paid);
     gate.slots[index] = tower;
     // Keep the player on the thing they just built.
     if (this.selectedSlot?.gate === gate) this.selected = tower;
     return true;
+  }
+
+  // ------------------------------------------------------------- demolition
+
+  /**
+   * What tearing something down pays back: half of everything spent on it,
+   * rounded down. A gatehouse is sold with whatever is installed on it, so the
+   * figure covers its turrets too — there is no way to leave a turret standing
+   * in mid-air.
+   */
+  sellValue(what: Tower | Gatehouse): number {
+    const spent =
+      what instanceof Gatehouse
+        ? what.goldSpent + what.installed.reduce((sum, t) => sum + t.goldSpent, 0)
+        : what.goldSpent;
+    return Math.floor(spent * SELL_REFUND);
+  }
+
+  /**
+   * Why this cannot be sold right now, or null when it can.
+   *
+   * The one refusal is housing. Pulling down a house whose roof other buildings
+   * are counted under would leave the realm owing shelter it does not have —
+   * every check in the game reads `housingFree`, and a negative one is a state
+   * the player cannot see and cannot easily undo. Sell a tower first, then the
+   * house. Food deliberately has no such guard: running short of grain is a
+   * survivable penalty and always has been, so selling your last farm is
+   * allowed to be a mistake you can make.
+   */
+  sellBlocker(what: Tower | Gatehouse): string | null {
+    if (this.state === 'gameover' || this.state === 'victory') return 'The game is over';
+
+    const capacityLost = what instanceof Gatehouse ? 0 : what.stats.houseCapacity;
+    if (capacityLost > 0) {
+      const housingFreed =
+        what instanceof Gatehouse ? 0 : (what.def.housing ?? 0);
+      if (this.housingFree + housingFreed - capacityLost < 0) {
+        return 'Your people would have nowhere to live';
+      }
+    }
+    return null;
+  }
+
+  /** Tear a building down and take back half of what it cost. */
+  sell(what: Tower | Gatehouse): boolean {
+    if (this.sellBlocker(what)) return false;
+
+    const refund = this.sellValue(what);
+
+    if (what instanceof Gatehouse) {
+      const index = this.gates.indexOf(what);
+      if (index < 0) return false;
+      this.gates.splice(index, 1);
+    } else {
+      const index = this.towers.indexOf(what);
+      if (index >= 0) {
+        this.towers.splice(index, 1);
+      } else {
+        // A turret installed on a gatehouse: clear its slot instead.
+        const gate = this.gates.find((g) => g.slots.includes(what));
+        if (!gate) return false;
+        gate.slots[gate.slots.indexOf(what)] = null;
+      }
+    }
+
+    this.gold += refund;
+    if (this.selected === what) this.selected = null;
+    return true;
+  }
+
+  /** Sell whatever is currently selected, if it is something that can be sold. */
+  sellSelected(): boolean {
+    const target = this.selectedTower ?? this.selectedGate;
+    return target ? this.sell(target) : false;
   }
 
   /** Whether a particular upgrade on the selected tower can be bought right now. */
@@ -981,6 +1191,7 @@ export class Game {
     if (!upgrade) return false;
 
     this.gold -= upgrade.cost;
+    tower.goldSpent += upgrade.cost;
     tower.applyUpgrade(id);
     return true;
   }
@@ -1099,7 +1310,7 @@ export class Game {
     this.techs.clear();
     this.keepGateReinforced = false;
     this.gold = this.startingGold;
-    this.lives = STARTING_LIVES;
+    this.lives = this.modeDef.lives;
     this.waveNumber = 0;
     this.state = 'idle';
     this.selectedTowerId = null;

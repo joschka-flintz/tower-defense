@@ -73,6 +73,14 @@ export class Tower implements DamageSource {
   readonly purchased = new Set<string>();
   stats: TowerStats;
 
+  /**
+   * Gold actually spent on this building — what was paid to raise it, plus
+   * every upgrade since. Recorded rather than recomputed from the price list
+   * because it is what a refund is owed against: nation discounts, and any
+   * future price change, must not turn a sale into a profit or a loss.
+   */
+  goldSpent = 0;
+
   angle = -Math.PI / 2;
   private cooldown = 0;
   /**
@@ -476,6 +484,7 @@ export class Tower implements DamageSource {
       dps: this.stats.unitDps * this.effectiveness,
       speed: this.stats.unitSpeed,
       retreatAt: this.stats.retreatAt,
+      restAt: this.stats.restAt,
       whirlwindDamage: this.stats.whirlwindDamage,
       whirlwindRadius: this.stats.whirlwindRadius,
       whirlwindInterval: this.stats.whirlwindInterval,

@@ -40,10 +40,18 @@ export class Gatehouse {
   readonly angle: number;
   /** Where along the route the gate sits. */
   readonly pathDistance: number;
+  /**
+   * Which route it stands on. A map can have several, each making for its own
+   * gate, and a wall across one of them is no obstacle at all to the others.
+   */
+  readonly routeId: string;
 
   readonly purchased = new Set<string>();
   stats: TowerStats;
   hp: number;
+
+  /** Gold spent on the gate itself, for what a sale refunds. Repairs do not count. */
+  goldSpent = 0;
 
   /** The two emplacements on top, left and right of the road. */
   slots: Array<Tower | null> = [null, null];
@@ -58,6 +66,7 @@ export class Gatehouse {
     angle: number,
     pathDistance: number,
     roadHalfWidth: number,
+    routeId = 'main',
   ) {
     this.def = def;
     this.x = x;
@@ -65,6 +74,7 @@ export class Gatehouse {
     this.angle = angle;
     this.pathDistance = pathDistance;
     this.roadHalfWidth = roadHalfWidth;
+    this.routeId = routeId;
     this.stats = statsFor(def, this.purchased);
     this.hp = this.stats.gateHp;
   }
